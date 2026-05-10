@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Brand-mapped shadcn tokens — all HSL */
+    --background: 38 36% 92%;       /* cream #F2EDE4 */
+    --foreground: 0 0% 4%;          /* ink #0A0A0A */
+
+    --card: 0 0% 10%;               /* dark stat cards #1A1A1A */
+    --card-foreground: 38 36% 92%;
+
+    --popover: 38 36% 92%;
+    --popover-foreground: 0 0% 4%;
+
+    --primary: 0 0% 4%;             /* primary CTA = ink */
+    --primary-foreground: 38 36% 92%;
+
+    --secondary: 38 30% 96%;
+    --secondary-foreground: 0 0% 4%;
+
+    --muted: 38 30% 88%;
+    --muted-foreground: 0 0% 53%;   /* #888888 */
+
+    --accent: 152 43% 18%;          /* #1B4332 */
+    --accent-foreground: 38 36% 92%;
+
+    --destructive: 0 100% 40%;      /* #CC0000 */
+
+    --border: 38 20% 80%;
+    --input: 38 20% 80%;
+    --ring: 152 43% 18%;
+
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
