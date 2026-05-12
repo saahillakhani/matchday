@@ -1,0 +1,54 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { getLeagueByCode } from "@/lib/league-lookup";
+
+type JoinPayload = { code?: unknown };
+
+export async function POST(request: Request) {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  }
+
+  const body = (await request.json().catch(() => ({}))) as JoinPayload;
+  const code =
+    typeof body.code === "string" ? body.code.trim().toLowerCase() : "";
+
+  if (!code) {
+    return NextResponse.json({ error: "Missing code" }, { status: 400 });
+  }
+
+  const { league, error: lookupError } = await getLeagueByCode(supabase, code);
+  if (lookupError) {
+    console.error("[league/join] lookup failed:", lookupError);
+    return NextResponse.json({ error: lookupError }, { status: 500 });
+  }
+  if (!league) {
+    return NextResponse.json(
+      { error: "No league with that code" },
+      { status: 404 },
+    );
+  }
+  if (league.locked) {
+    return NextResponse.json({ error: "League is locked" }, { status: 403 });
+  }
+
+  const { error: memberError } = await supabase
+    .from("league_members")
+    .insert({ league_id: league.id, user_id: user.id });
+
+  if (memberError) {
+    // 23505 = unique_violation = already a member; idempotent join.
+    if ((memberError as { code?: string }).code === "23505") {
+      return NextResponse.json({ league });
+    }
+    console.error("[league/join] member insert failed:", memberError);
+    return NextResponse.json({ error: memberError.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ league });
+}

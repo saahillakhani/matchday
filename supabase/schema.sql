@@ -157,6 +157,23 @@ create policy "results_read" on results for select
   using (league_id in (select public.user_league_ids()));
 
 
+-- Public RPC for the /join?code=… landing page. Returns just the league
+-- name + locked flag so an anonymous visitor can confirm what they're
+-- about to join. Bypasses RLS but exposes only the minimum needed.
+create or replace function public.get_league_by_code(p_code text)
+returns table (id uuid, name text, locked boolean)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select l.id, l.name, l.locked from public.leagues l where l.code = p_code limit 1;
+$$;
+
+revoke all on function public.get_league_by_code(text) from public;
+grant execute on function public.get_league_by_code(text) to anon, authenticated;
+
+
 -- ── 7. Realtime ───────────────────────────────────────────────
 -- Subscribe to predictions + results so the UI updates live.
 

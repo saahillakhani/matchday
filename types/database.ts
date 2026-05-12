@@ -206,7 +206,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_league_by_code: {
+        Args: { p_code: string }
+        Returns: {
+          id: string
+          locked: boolean
+          name: string
+        }[]
+      }
+      user_league_ids: { Args: never; Returns: string[] }
     }
     Enums: {
       [_ in never]: never
