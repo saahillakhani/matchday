@@ -19,7 +19,8 @@ export async function GET(request: Request) {
     );
   }
 
-  // TODO (step 4): handle pendingLeagueCode cookie and league-aware routing
-  // (zero league_members → /league/new, has leagues → /predict).
-  return NextResponse.redirect(`${origin}${next}`);
+  // Always pass through /welcome — it self-skips for users who already
+  // chose a display name. TODO (step 4): also handle pendingLeagueCode cookie
+  // and league-aware routing (zero league_members → /league/new, else → /predict).
+  return NextResponse.redirect(`${origin}/welcome`);
 }

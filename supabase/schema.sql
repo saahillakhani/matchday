@@ -106,52 +106,55 @@ alter table results         enable row level security;
 create policy "profiles_read"   on profiles for select using (auth.role() = 'authenticated');
 create policy "profiles_update" on profiles for update using (auth.uid() = id);
 
--- leagues: members can read their own leagues; authenticated users can create
-create policy "leagues_read"   on leagues for select using (
-  exists (
-    select 1 from league_members
-    where league_members.league_id = leagues.id
-    and   league_members.user_id   = auth.uid()
-  )
-);
-create policy "leagues_insert" on leagues for insert with check (auth.role() = 'authenticated');
+-- Helper: league IDs the current user is a member of. SECURITY DEFINER
+-- bypasses RLS on league_members, avoiding infinite recursion in policies
+-- that need to check membership. It only returns rows for auth.uid().
+create or replace function public.user_league_ids()
+returns setof uuid
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select league_id from public.league_members where user_id = auth.uid();
+$$;
+
+revoke all on function public.user_league_ids() from public;
+grant execute on function public.user_league_ids() to authenticated;
+
+-- leagues: members (or creator) can read; users can only create leagues
+-- attributed to themselves. The "or created_by" branch on read is what
+-- lets .insert().select() round-trips return the new row before the
+-- creator's league_members row has been inserted.
+create policy "leagues_read" on leagues for select
+  using (
+    id in (select public.user_league_ids())
+    or created_by = auth.uid()
+  );
+create policy "leagues_insert" on leagues for insert
+  with check (created_by = auth.uid());
 create policy "leagues_update" on leagues for update using (created_by = auth.uid());
 
 -- league_members: members can see who's in their league; users can join (insert themselves)
-create policy "members_read"   on league_members for select using (
-  exists (
-    select 1 from league_members lm
-    where lm.league_id = league_members.league_id
-    and   lm.user_id   = auth.uid()
-  )
-);
+create policy "members_read" on league_members for select
+  using (league_id in (select public.user_league_ids()));
 create policy "members_insert" on league_members for insert
   with check (user_id = auth.uid());
 create policy "members_delete" on league_members for delete
   using (user_id = auth.uid()); -- users can leave a league
 
--- predictions: users can only write their own; read handled in app layer
--- (rotation-based visibility is too complex for RLS — enforced in API routes)
-create policy "predictions_read" on predictions for select using (
-  exists (
-    select 1 from league_members
-    where league_members.league_id = predictions.league_id
-    and   league_members.user_id   = auth.uid()
-  )
-);
+-- predictions: users can only write their own; read gated by league membership.
+-- (Rotation-based visibility is too complex for RLS — enforced in API routes.)
+create policy "predictions_read" on predictions for select
+  using (league_id in (select public.user_league_ids()));
 create policy "predictions_insert" on predictions for insert
   with check (user_id = auth.uid());
 create policy "predictions_update" on predictions for update
   using (user_id = auth.uid());
 
 -- results: all league members can read; only service role can write (cron)
-create policy "results_read" on results for select using (
-  exists (
-    select 1 from league_members
-    where league_members.league_id = results.league_id
-    and   league_members.user_id   = auth.uid()
-  )
-);
+create policy "results_read" on results for select
+  using (league_id in (select public.user_league_ids()));
 
 
 -- ── 7. Realtime ───────────────────────────────────────────────
