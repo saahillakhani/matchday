@@ -1,8 +1,19 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: { code?: string };
+}) {
+  // Safety net: if a magic-link `?code=` lands on / (because Supabase fell
+  // back to Site URL instead of our /auth/callback), forward it ourselves.
+  if (searchParams.code) {
+    redirect(`/auth/callback?code=${encodeURIComponent(searchParams.code)}`);
+  }
+
   const supabase = createClient();
   const {
     data: { user },
