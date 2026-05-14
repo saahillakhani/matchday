@@ -67,9 +67,16 @@ export default async function Home({
           </p>
 
           {leagues.length === 0 ? (
-            <Link href="/league/new">
-              <Button>Create a league</Button>
-            </Link>
+            <div className="w-full space-y-2">
+              <Link href="/league/new" className="block">
+                <Button className="w-full">Create a league</Button>
+              </Link>
+              <Link href="/join" className="block">
+                <Button variant="outline" className="w-full">
+                  Join with a code
+                </Button>
+              </Link>
+            </div>
           ) : (
             <div className="w-full space-y-3">
               <p className="text-xs uppercase tracking-widest text-muted-foreground">
@@ -88,11 +95,18 @@ export default async function Home({
                   </div>
                 ))}
               </div>
-              <Link href="/league/new" className="block">
-                <Button variant="outline" className="w-full">
-                  Create another league
-                </Button>
-              </Link>
+              <div className="space-y-2">
+                <Link href="/league/new" className="block">
+                  <Button variant="outline" className="w-full">
+                    Create another league
+                  </Button>
+                </Link>
+                <Link href="/join" className="block">
+                  <Button variant="outline" className="w-full">
+                    Join with a code
+                  </Button>
+                </Link>
+              </div>
             </div>
           )}
 
