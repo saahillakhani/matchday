@@ -1,9 +1,12 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { getLeagueByCode } from "@/lib/league-lookup";
+import { MAX_LEAGUE_SIZE } from "@/lib/constants";
 import { CodeForm } from "./code-form";
 import { JoinConfirm } from "./confirm";
+import { Full } from "./full";
 
 export default async function JoinPage({
   searchParams,
@@ -29,6 +32,38 @@ export default async function JoinPage({
     return <Locked leagueName={league.name} />;
   }
 
+  // Pre-auth visitors can't read league_members under RLS, so use the
+  // service-role client just to count for display purposes.
+  const service = createServiceClient();
+  const { count: memberCount } = await service
+    .from("league_members")
+    .select("*", { count: "exact", head: true })
+    .eq("league_id", league.id);
+
+  const count = memberCount ?? 0;
+
+  // Hard-stop on a full league. Show the user upfront rather than
+  // sending them through sign-in only to fail the join.
+  if (count >= MAX_LEAGUE_SIZE) {
+    // Allow already-members through; they need to know they're already in.
+    const {
+      data: { user: maybeUser },
+    } = await supabase.auth.getUser();
+    let isAlreadyMember = false;
+    if (maybeUser) {
+      const { data: existing } = await service
+        .from("league_members")
+        .select("user_id")
+        .eq("league_id", league.id)
+        .eq("user_id", maybeUser.id)
+        .maybeSingle();
+      isAlreadyMember = !!existing;
+    }
+    if (!isAlreadyMember) {
+      return <Full leagueName={league.name} memberCount={count} />;
+    }
+  }
+
   // Stash the code and redirect to sign-in if the visitor isn't authed yet.
   const {
     data: { user },
@@ -44,7 +79,13 @@ export default async function JoinPage({
     redirect("/sign-in?intent=join");
   }
 
-  return <JoinConfirm code={code} leagueName={league.name} />;
+  return (
+    <JoinConfirm
+      code={code}
+      leagueName={league.name}
+      memberCount={count}
+    />
+  );
 }
 
 function Locked({ leagueName }: { leagueName: string }) {

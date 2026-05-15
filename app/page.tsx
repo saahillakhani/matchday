@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
+import { MAX_LEAGUE_SIZE } from "@/lib/constants";
 
 export default async function Home({
   searchParams,
@@ -34,10 +35,22 @@ export default async function Home({
         .eq("user_id", user.id)
     : Promise.resolve({ data: null });
 
-  const [{ data: profile }, { data: memberships }] = await Promise.all([
-    profilePromise,
-    leaguesPromise,
-  ]);
+  // RLS lets a member read all league_members rows for leagues they're in,
+  // so we can count members per league with one query.
+  const allMembersPromise = user
+    ? supabase.from("league_members").select("league_id")
+    : Promise.resolve({ data: null });
+
+  const [{ data: profile }, { data: memberships }, { data: allMembers }] =
+    await Promise.all([profilePromise, leaguesPromise, allMembersPromise]);
+
+  const memberCountByLeague = new Map<string, number>();
+  for (const row of allMembers ?? []) {
+    memberCountByLeague.set(
+      row.league_id!,
+      (memberCountByLeague.get(row.league_id!) ?? 0) + 1,
+    );
+  }
 
   const leagues =
     memberships
@@ -83,17 +96,29 @@ export default async function Home({
                 Your leagues
               </p>
               <div className="space-y-2">
-                {leagues.map((l) => (
-                  <div
-                    key={l.id}
-                    className="border border-border rounded-card px-4 py-3 text-left bg-white"
-                  >
-                    <p className="font-medium">{l.name}</p>
-                    <p className="font-mono text-xs text-muted-foreground">
-                      code · {l.code}
-                    </p>
-                  </div>
-                ))}
+                {leagues.map((l) => {
+                  const count = memberCountByLeague.get(l.id) ?? 0;
+                  const full = count >= MAX_LEAGUE_SIZE;
+                  return (
+                    <div
+                      key={l.id}
+                      className="border border-border rounded-card px-4 py-3 text-left bg-white"
+                    >
+                      <p className="font-medium">{l.name}</p>
+                      <div className="flex items-baseline justify-between mt-1">
+                        <p className="font-mono text-xs text-muted-foreground">
+                          code · {l.code}
+                        </p>
+                        <p className="font-mono text-xs text-muted-foreground">
+                          {count} / {MAX_LEAGUE_SIZE}
+                          {full && (
+                            <span className="ml-1 text-foreground">· full</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
               <div className="space-y-2">
                 <Link href="/league/new" className="block">

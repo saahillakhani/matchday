@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { MAX_LEAGUE_SIZE } from "@/lib/constants";
 
 type State =
   | { kind: "idle" }
@@ -12,9 +13,11 @@ type State =
 export function JoinConfirm({
   code,
   leagueName,
+  memberCount,
 }: {
   code: string;
   leagueName: string;
+  memberCount: number;
 }) {
   const router = useRouter();
   const [state, setState] = useState<State>({ kind: "idle" });
@@ -50,6 +53,14 @@ export function JoinConfirm({
       </h1>
       <p className="text-muted-foreground italic mt-4 max-w-md">
         Ready when you are.
+      </p>
+
+      <p className="font-mono text-sm text-muted-foreground mt-6">
+        {memberCount} / {MAX_LEAGUE_SIZE} members
+        <span className="ml-2">
+          · {MAX_LEAGUE_SIZE - memberCount} slot
+          {MAX_LEAGUE_SIZE - memberCount === 1 ? "" : "s"} left
+        </span>
       </p>
 
       <Button

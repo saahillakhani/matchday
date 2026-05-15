@@ -2,10 +2,9 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getLeagueByCode } from "@/lib/league-lookup";
+import { MAX_LEAGUE_SIZE } from "@/lib/constants";
 
 type JoinPayload = { code?: unknown };
-
-const MAX_LEAGUE_SIZE = 8;
 
 export async function POST(request: Request) {
   const supabase = createClient();
