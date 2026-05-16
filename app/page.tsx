@@ -100,9 +100,10 @@ export default async function Home({
                   const count = memberCountByLeague.get(l.id) ?? 0;
                   const full = count >= MAX_LEAGUE_SIZE;
                   return (
-                    <div
+                    <Link
                       key={l.id}
-                      className="border border-border rounded-card px-4 py-3 text-left bg-white"
+                      href={`/predict?leagueId=${l.id}`}
+                      className="block border border-border rounded-card px-4 py-3 text-left bg-white hover:border-foreground transition-colors"
                     >
                       <p className="font-medium">{l.name}</p>
                       <div className="flex items-baseline justify-between mt-1">
@@ -116,7 +117,7 @@ export default async function Home({
                           )}
                         </p>
                       </div>
-                    </div>
+                    </Link>
                   );
                 })}
               </div>
