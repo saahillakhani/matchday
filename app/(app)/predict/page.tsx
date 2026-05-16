@@ -66,6 +66,7 @@ export default async function PredictPage({
 
   return (
     <PredictForm
+      userId={user.id}
       leagueId={league.id}
       leagueName={league.name}
       currentGw={league.current_gw}
