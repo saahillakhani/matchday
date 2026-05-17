@@ -241,7 +241,7 @@ function FormGrid({ players }: { players: Player[] }) {
         {players.map((p) => (
           <div
             key={p.userId}
-            className="flex items-center gap-4 overflow-x-auto pb-2 scrollbar-none"
+            className="flex items-center gap-4 pb-2"
           >
             <div className="w-24 shrink-0">
               <p className="font-medium text-sm">{p.displayName}</p>
@@ -251,7 +251,7 @@ function FormGrid({ players }: { players: Player[] }) {
                 </p>
               )}
             </div>
-            <div className="flex-1 min-w-0 overflow-x-auto scrollbar-none">
+            <div className="flex-1 min-w-0">
               <FormBars bars={p.perGw} barWidth={22} showLabels />
             </div>
             <p className="font-mono tabular-nums text-sm font-semibold w-10 text-right shrink-0">

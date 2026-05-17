@@ -140,7 +140,7 @@ export function YouView(props: Props) {
           <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
             Form · {formRangeLabel(props.formBars)}
           </p>
-          <div className="mt-3 overflow-x-auto pb-2 scrollbar-none">
+          <div className="mt-3 pb-2">
             <FormBars
               bars={props.formBars}
               barWidth={28}
