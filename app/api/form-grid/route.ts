@@ -40,7 +40,8 @@ export async function GET(request: Request) {
     supabase
       .from("predictions")
       .select("user_id, gw, match_index, home_score, away_score")
-      .eq("league_id", leagueId),
+      .eq("league_id", leagueId)
+      .limit(50000),
     supabase
       .from("results")
       .select("gw, match_index, home_score, away_score")
