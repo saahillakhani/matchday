@@ -24,7 +24,6 @@ export function SettingsView(props: Props) {
   const [copied, setCopied] = useState(false);
   // Local-only toggle state — wired to nothing in MVP per build plan.
   // The screen visually completes the design; persistence comes post-v1.
-  const [bonusTracked, setBonusTracked] = useState(true);
   const [notifications, setNotifications] = useState(true);
   const [lockAtKickoff, setLockAtKickoff] = useState(true);
 
@@ -110,12 +109,6 @@ export function SettingsView(props: Props) {
                 : `${props.members.length} · sets on lock`
             }
             disabled
-          />
-          <SettingsRow
-            label="Bonus tracked"
-            value="Separate"
-            toggle={bonusTracked}
-            onToggle={setBonusTracked}
           />
           <SettingsRow
             label="Notifications"
@@ -206,7 +199,7 @@ function Toggle({
     >
       <span
         className={[
-          "absolute top-0.5 w-5 h-5 rounded-full bg-background transition-transform",
+          "absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform",
           on ? "translate-x-4" : "translate-x-0.5",
         ].join(" ")}
       />

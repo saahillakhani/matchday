@@ -138,11 +138,15 @@ export function YouView(props: Props) {
 
         <div className="mt-8">
           <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-            Form · last {props.formBars.length || 0} gameweek
-            {props.formBars.length === 1 ? "" : "s"}
+            Form · {formRangeLabel(props.formBars)}
           </p>
           <div className="mt-3 overflow-x-auto pb-2 scrollbar-none">
-            <FormBars bars={props.formBars} barWidth={28} height={80} />
+            <FormBars
+              bars={props.formBars}
+              barWidth={28}
+              height={80}
+              showLabels
+            />
           </div>
         </div>
 
@@ -157,4 +161,10 @@ function ordinal(n: number): string {
   const s = ["th", "st", "nd", "rd"];
   const v = n % 100;
   return `${n}${s[(v - 20) % 10] ?? s[v] ?? s[0]}`;
+}
+
+function formRangeLabel(bars: Bar[]): string {
+  if (bars.length === 0) return "no GWs played yet";
+  if (bars.length === 1) return `GW ${bars[0].gw}`;
+  return `GWs ${bars[0].gw}–${bars[bars.length - 1].gw}`;
 }

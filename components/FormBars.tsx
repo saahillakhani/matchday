@@ -10,55 +10,74 @@ type Props = {
   /** Width per bar in px; the row scrolls horizontally if needed. */
   barWidth?: number;
   height?: number;
+  /** Render a small GW number under each bar. */
+  showLabels?: boolean;
 };
 
 const BAR_GAP = 4;
+const LABEL_HEIGHT = 14;
 
-export function FormBars({ bars, barWidth = 18, height = 64 }: Props) {
+export function FormBars({
+  bars,
+  barWidth = 18,
+  height = 64,
+  showLabels = false,
+}: Props) {
   if (bars.length === 0) {
     return (
       <p className="text-xs text-muted-foreground italic">No GWs scored yet.</p>
     );
   }
 
-  // Scale relative to the largest bar across the whole row so heights stay
-  // comparable within one player.
   const maxPoints = Math.max(1, ...bars.map((b) => b.points));
   const innerWidth = bars.length * (barWidth + BAR_GAP) - BAR_GAP;
+  const totalHeight = showLabels ? height + LABEL_HEIGHT : height;
+  const barAreaHeight = height;
 
   return (
     <svg
       width={innerWidth}
-      height={height}
-      viewBox={`0 0 ${innerWidth} ${height}`}
+      height={totalHeight}
+      viewBox={`0 0 ${innerWidth} ${totalHeight}`}
       className="block"
       aria-label={`Per-gameweek points: ${bars.map((b) => `gw${b.gw}=${b.points}`).join(", ")}`}
     >
       {bars.map((b, i) => {
-        const h = b.points === 0 ? 2 : (b.points / maxPoints) * (height - 2);
+        const h = b.points === 0 ? 2 : (b.points / maxPoints) * (barAreaHeight - 2);
         const x = i * (barWidth + BAR_GAP);
-        const y = height - h;
+        const y = barAreaHeight - h;
         const fill = b.isBest
-          ? "var(--accent)"
+          ? "#2D6A4F"
           : b.points === 0
             ? "transparent"
-            : "var(--ink)";
-        const stroke = b.isLive ? "var(--ink)" : "none";
+            : "#0A0A0A";
         return (
-          <rect
-            key={b.gw}
-            x={x}
-            y={y}
-            width={barWidth}
-            height={h}
-            rx={2}
-            fill={fill === "var(--accent)" ? "#2D6A4F" : fill === "var(--ink)" ? "#0A0A0A" : "transparent"}
-            stroke={stroke === "var(--ink)" ? "#0A0A0A" : "none"}
-            strokeWidth={b.isLive ? 1 : 0}
-            strokeDasharray={b.isLive && b.points === 0 ? "2 2" : undefined}
-          >
-            <title>{`GW ${b.gw}: ${b.points} pts`}</title>
-          </rect>
+          <g key={b.gw}>
+            <rect
+              x={x}
+              y={y}
+              width={barWidth}
+              height={h}
+              rx={2}
+              fill={fill}
+              stroke={b.isLive ? "#0A0A0A" : "none"}
+              strokeWidth={b.isLive ? 1 : 0}
+              strokeDasharray={b.isLive && b.points === 0 ? "2 2" : undefined}
+            >
+              <title>{`GW ${b.gw}: ${b.points} pts`}</title>
+            </rect>
+            {showLabels && (
+              <text
+                x={x + barWidth / 2}
+                y={barAreaHeight + LABEL_HEIGHT - 2}
+                textAnchor="middle"
+                className="fill-muted-foreground"
+                style={{ fontSize: "9px", fontFamily: "ui-monospace, monospace" }}
+              >
+                {b.gw}
+              </text>
+            )}
+          </g>
         );
       })}
     </svg>
