@@ -18,8 +18,12 @@ export function GwSwitcher({
   onChange,
   range = 3,
 }: Props) {
-  const start = Math.max(MIN_GW, currentGw - range);
-  const end = Math.min(MAX_GW, currentGw + range);
+  // Range around the GW the user is viewing, not the league's current GW.
+  // That way if you navigate forward (or back) past current_gw ± 3, the
+  // pill row follows you. The OPEN tag still tags currentGw whenever it
+  // lands in the window.
+  const start = Math.max(MIN_GW, selectedGw - range);
+  const end = Math.min(MAX_GW, selectedGw + range);
   const gws: number[] = [];
   for (let i = start; i <= end; i++) gws.push(i);
 
