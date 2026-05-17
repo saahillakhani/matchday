@@ -80,7 +80,7 @@ export default async function TablePage({
   const { rows, rankedOrder } = computeStandings({ members, picks, results });
   const rowByUser = new Map(rows.map((r) => [r.userId, r]));
 
-  const allGws = [...new Set(results.map((r) => r.gw))].sort(
+  const allGws = Array.from(new Set(results.map((r) => r.gw))).sort(
     (a, b) => b - a,
   );
   const latestGw = allGws[0] ?? null;

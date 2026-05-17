@@ -88,7 +88,7 @@ export function computeStandings(input: {
     byMatch.set(r.matchIndex, { home: r.home, away: r.away });
   }
 
-  const allGws = [...resultsByGw.keys()].sort((a, b) => a - b);
+  const allGws = Array.from(resultsByGw.keys()).sort((a, b) => a - b);
 
   const rows: StandingsRow[] = input.members.map((m) => {
     const perGw: PerGw[] = [];

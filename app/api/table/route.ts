@@ -81,9 +81,9 @@ export async function GET(request: Request) {
 
   // Most recent GW we have results for — drives the "GW" column showing
   // each player's score this gameweek.
-  const allGws = [
-    ...new Set(results.map((r) => r.gw)),
-  ].sort((a, b) => b - a);
+  const allGws = Array.from(new Set(results.map((r) => r.gw))).sort(
+    (a, b) => b - a,
+  );
   const latestGw = allGws[0] ?? null;
 
   const tableRows = rankedOrder.map((userId, idx) => {
