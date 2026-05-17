@@ -6,7 +6,7 @@ const TABS: Array<{ id: Tab; label: string; enabled: boolean }> = [
   { id: "predict", label: "Predict", enabled: true },
   { id: "results", label: "Results", enabled: true },
   { id: "table", label: "Table", enabled: true },
-  { id: "you", label: "You", enabled: false },
+  { id: "you", label: "You", enabled: true },
 ];
 
 function hrefFor(tab: Tab, leagueId: string): string {
