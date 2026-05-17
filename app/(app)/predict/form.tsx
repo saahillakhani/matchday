@@ -7,6 +7,7 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GwSwitcher } from "@/components/GwSwitcher";
 import { MatchRow } from "@/components/MatchRow";
+import { NavTabs } from "@/components/NavTabs";
 import { PicksMatrix } from "@/components/PicksMatrix";
 import { PlayerChip } from "@/components/PlayerChip";
 import { createClient } from "@/lib/supabase/browser";
@@ -209,6 +210,10 @@ export function PredictForm(props: Props) {
           Lock in your picks any time before kickoff. You&apos;ll see picks
           above you in rotation as they come in.
         </p>
+
+        <div className="mt-6">
+          <NavTabs current="predict" leagueId={props.leagueId} />
+        </div>
 
         <div className="mt-6">
           <GwSwitcher
