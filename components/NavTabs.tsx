@@ -5,7 +5,7 @@ type Tab = "predict" | "results" | "table" | "you";
 const TABS: Array<{ id: Tab; label: string; enabled: boolean }> = [
   { id: "predict", label: "Predict", enabled: true },
   { id: "results", label: "Results", enabled: true },
-  { id: "table", label: "Table", enabled: false },
+  { id: "table", label: "Table", enabled: true },
   { id: "you", label: "You", enabled: false },
 ];
 
