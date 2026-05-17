@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { GwSwitcher } from "@/components/GwSwitcher";
 import { NavTabs } from "@/components/NavTabs";
+import { RefreshButton } from "@/components/RefreshButton";
 import { ResultRow } from "@/components/ResultRow";
 import { createClient } from "@/lib/supabase/browser";
 import type { Aggregate, ScoreLabel } from "@/lib/scoring";
@@ -91,12 +92,19 @@ export function ResultsView(props: Props) {
           All leagues
         </Link>
 
-        <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground mt-6">
-          {props.leagueName}
-        </p>
-        <h1 className="font-serif text-5xl font-semibold leading-tight mt-2">
-          Results
-        </h1>
+        <div className="flex items-start justify-between mt-6">
+          <div>
+            <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
+              {props.leagueName}
+            </p>
+            <h1 className="font-serif text-5xl font-semibold leading-tight mt-2">
+              Results
+            </h1>
+          </div>
+          <div className="pt-3">
+            <RefreshButton leagueId={props.leagueId} />
+          </div>
+        </div>
 
         <div className="mt-6">
           <NavTabs current="results" leagueId={props.leagueId} />

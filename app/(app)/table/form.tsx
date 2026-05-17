@@ -252,7 +252,7 @@ function FormGrid({ players }: { players: Player[] }) {
               )}
             </div>
             <div className="flex-1 min-w-0 overflow-x-auto scrollbar-none">
-              <FormBars bars={p.perGw} />
+              <FormBars bars={p.perGw} barWidth={22} showLabels />
             </div>
             <p className="font-mono tabular-nums text-sm font-semibold w-10 text-right shrink-0">
               {p.total}

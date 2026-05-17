@@ -192,9 +192,9 @@ function Toggle({
       disabled={disabled}
       onClick={() => onChange(!on)}
       className={[
-        "relative w-10 h-6 rounded-full transition-colors",
-        on ? "bg-foreground" : "bg-border",
-        disabled ? "opacity-40 cursor-not-allowed" : "",
+        "relative w-10 h-6 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        on ? "bg-foreground" : "bg-muted",
+        disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer",
       ].join(" ")}
     >
       <span
