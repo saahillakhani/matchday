@@ -228,7 +228,6 @@ export function PredictForm(props: Props) {
                 key={p.userId}
                 displayName={p.displayName}
                 isStarter={p.isStarter}
-                isMe={p.userId === props.userId}
               />
             ))}
           </div>
