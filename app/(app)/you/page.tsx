@@ -6,6 +6,7 @@ import {
   type RawPick,
   type RawResult,
 } from "@/lib/standings";
+import { fetchAllPredictions } from "@/lib/fetch-all-predictions";
 import { YouView } from "./form";
 
 export default async function YouPage({
@@ -34,21 +35,18 @@ export default async function YouPage({
     profiles: { display_name: string } | null;
   };
 
-  const [membersRes, picksRes, resultsRes] = await Promise.all([
+  const [membersRes, picksData, resultsRes] = await Promise.all([
     supabase
       .from("league_members")
       .select("user_id, profiles(display_name)")
       .eq("league_id", leagueId),
-    supabase
-      .from("predictions")
-      .select("user_id, gw, match_index, home_score, away_score")
-      .eq("league_id", leagueId)
-      .limit(50000),
+    fetchAllPredictions(supabase, leagueId),
     supabase
       .from("results")
       .select("gw, match_index, home_score, away_score")
       .eq("league_id", leagueId),
   ]);
+  const picksRes = { data: picksData };
 
   const members: Member[] = ((membersRes.data ?? []) as MemberRow[])
     .filter((m): m is MemberRow & { user_id: string } => !!m.user_id)
