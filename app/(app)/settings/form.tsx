@@ -102,15 +102,6 @@ export function SettingsView(props: Props) {
         {/* Settings rows */}
         <section className="mt-6">
           <SettingsRow
-            label="Players & order"
-            value={
-              props.locked
-                ? `${props.members.length} · locked`
-                : `${props.members.length} · sets on lock`
-            }
-            disabled
-          />
-          <SettingsRow
             label="Notifications"
             value={notifications ? "On" : "Off"}
             toggle={notifications}
@@ -122,7 +113,6 @@ export function SettingsView(props: Props) {
             toggle={lockAtKickoff}
             onToggle={setLockAtKickoff}
           />
-          <SettingsRow label="Theme" value="Paper" disabled />
         </section>
 
         {/* Sign out */}
@@ -192,16 +182,14 @@ function Toggle({
       disabled={disabled}
       onClick={() => onChange(!on)}
       className={[
-        "relative w-10 h-6 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-        on ? "bg-foreground" : "bg-muted",
+        "inline-flex items-center w-11 h-6 rounded-full px-0.5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        on ? "justify-end bg-foreground" : "justify-start bg-muted",
         disabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer",
       ].join(" ")}
     >
       <span
-        className={[
-          "absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform",
-          on ? "translate-x-4" : "translate-x-0.5",
-        ].join(" ")}
+        aria-hidden
+        className="block w-5 h-5 rounded-full bg-white shadow-sm"
       />
     </button>
   );
