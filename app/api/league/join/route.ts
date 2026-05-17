@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getLeagueByCode } from "@/lib/league-lookup";
+import { getFixtures } from "@/lib/fpl";
+import { filterByTeams, sortFixtures } from "@/lib/match-key";
 import { MAX_LEAGUE_SIZE } from "@/lib/constants";
 
 type JoinPayload = { code?: unknown };
@@ -39,10 +41,36 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "League is locked" }, { status: 403 });
   }
 
+  // Service-role client for the next few reads (membership + league row).
+  // RLS would block these for someone not yet in the league.
+  const service = createServiceClient();
+
+  // Defence against the daily-cron lag: even if league.locked is still
+  // false, reject the join if the current GW has already kicked off. The
+  // cron will eventually flip the flag, but we shouldn't accept new
+  // members between kickoff and the next cron run.
+  const { data: leagueRow } = await service
+    .from("leagues")
+    .select("current_gw, selected_teams")
+    .eq("id", league.id)
+    .single();
+
+  if (leagueRow) {
+    const fplFixtures = await getFixtures(leagueRow.current_gw);
+    const relevant = filterByTeams(fplFixtures, leagueRow.selected_teams);
+    const sorted = sortFixtures(relevant);
+    const firstKickoff = sorted[0]?.kickoffTime ?? null;
+    if (firstKickoff && new Date(firstKickoff) <= new Date()) {
+      return NextResponse.json(
+        { error: "League is locked" },
+        { status: 403 },
+      );
+    }
+  }
+
   // Enforce the member cap. RLS would block this count for a non-member, so
   // we use the service-role client (server-only) just for this read. If the
   // caller is already a member the unique constraint short-circuits below.
-  const service = createServiceClient();
   const { count: memberCount, error: countError } = await service
     .from("league_members")
     .select("*", { count: "exact", head: true })
