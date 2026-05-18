@@ -47,6 +47,7 @@ export default async function SettingsPage({
       leagueName={league.name}
       leagueCode={league.code}
       locked={league.locked}
+      currentGw={league.current_gw}
       isCreator={league.created_by === user.id}
       members={members}
     />

@@ -28,7 +28,7 @@ export default async function PredictPage({
   const { data: league } = await supabase
     .from("leagues")
     .select(
-      "id, name, code, selected_teams, current_gw, locked, base_order, created_by",
+      "id, name, code, selected_teams, current_gw, locked, base_order",
     )
     .eq("id", leagueId)
     .single();
@@ -128,7 +128,6 @@ export default async function PredictPage({
       selectedGw={gw}
       locked={locked}
       submitted={iHaveSubmitted}
-      isAdmin={league.created_by === user.id}
       firstKickoff={firstKickoff}
       rotation={rotation}
       fixtures={sorted.map((f) => ({

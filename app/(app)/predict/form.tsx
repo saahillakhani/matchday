@@ -48,8 +48,6 @@ type Props = {
   locked: boolean;
   /** The current user has submitted this GW. */
   submitted: boolean;
-  /** The current user is the league creator (can unlock a GW). */
-  isAdmin: boolean;
   firstKickoff: string | null;
   rotation: RotationChip[];
   fixtures: Fixture[];
@@ -60,7 +58,6 @@ type ActionState =
   | { kind: "idle" }
   | { kind: "saving" }
   | { kind: "submitting" }
-  | { kind: "unlocking" }
   | { kind: "saved" }
   | { kind: "error"; message: string };
 
@@ -245,32 +242,6 @@ export function PredictForm(props: Props) {
     router.refresh();
   }
 
-  async function onUnlock() {
-    if (
-      !window.confirm(
-        "Unlock this gameweek for everyone? All players drop back to draft and can edit + re-submit. Scores already entered are kept.",
-      )
-    ) {
-      return;
-    }
-    setState({ kind: "unlocking" });
-    const res = await fetch("/api/league/unlock-gw", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        leagueId: props.leagueId,
-        gw: props.selectedGw,
-      }),
-    });
-    if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { error?: string };
-      setState({ kind: "error", message: body.error ?? "Could not unlock" });
-      return;
-    }
-    setState({ kind: "idle" });
-    router.refresh();
-  }
-
   const filledCount = filledPicks().length;
   const total = props.fixtures.length;
 
@@ -332,12 +303,10 @@ export function PredictForm(props: Props) {
             total={total}
             locked={props.locked}
             submitted={props.submitted}
-            isAdmin={props.isAdmin}
             state={state}
             onPickChange={handlePickChange}
             onSave={onSave}
             onSubmit={onSubmit}
-            onUnlock={onUnlock}
           />
         ) : (
           <EveryoneView
@@ -392,12 +361,10 @@ function MyPicks({
   total,
   locked,
   submitted,
-  isAdmin,
   state,
   onPickChange,
   onSave,
   onSubmit,
-  onUnlock,
 }: {
   fixtures: Fixture[];
   picks: Record<number, Pick>;
@@ -406,12 +373,10 @@ function MyPicks({
   total: number;
   locked: boolean;
   submitted: boolean;
-  isAdmin: boolean;
   state: ActionState;
   onPickChange: (matchIndex: number, h: number | null, a: number | null) => void;
   onSave: () => void;
   onSubmit: () => void;
-  onUnlock: () => void;
 }) {
   if (total === 0) {
     return (
@@ -461,19 +426,12 @@ function MyPicks({
           </p>
         </div>
       ) : submitted ? (
-        <div className="mt-6 space-y-3">
-          <div className="border border-accent/30 bg-accent/5 rounded-card px-4 py-3">
-            <p className="text-sm font-medium text-accent-green">
-              Submitted ✓
-            </p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Your picks are locked for this gameweek. Ask the league admin to
-              unlock it if you need to change them.
-            </p>
-          </div>
-          {isAdmin && (
-            <AdminUnlock state={state} onUnlock={onUnlock} />
-          )}
+        <div className="mt-6 border border-accent/30 bg-accent/5 rounded-card px-4 py-3">
+          <p className="text-sm font-medium text-accent-green">Submitted ✓</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Your picks are locked for this gameweek. The league admin can
+            unlock it from Settings if you need to change them.
+          </p>
         </div>
       ) : (
         <div className="mt-6 space-y-2">
@@ -504,31 +462,9 @@ function MyPicks({
               Draft saved ✓ — not submitted yet.
             </p>
           )}
-          {isAdmin && <AdminUnlock state={state} onUnlock={onUnlock} />}
         </div>
       )}
     </>
-  );
-}
-
-function AdminUnlock({
-  state,
-  onUnlock,
-}: {
-  state: ActionState;
-  onUnlock: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onUnlock}
-      disabled={state.kind === "unlocking"}
-      className="w-full text-xs uppercase tracking-widest text-muted-foreground hover:text-destructive disabled:opacity-50 py-2"
-    >
-      {state.kind === "unlocking"
-        ? "Unlocking…"
-        : "Unlock gameweek for everyone (admin)"}
-    </button>
   );
 }
 

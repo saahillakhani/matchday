@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, ChevronRight, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { NavTabs } from "@/components/NavTabs";
 
 type Member = {
@@ -16,16 +18,28 @@ type Props = {
   leagueName: string;
   leagueCode: string;
   locked: boolean;
+  currentGw: number;
   isCreator: boolean;
   members: Member[];
 };
 
+type UnlockState =
+  | { kind: "idle" }
+  | { kind: "working" }
+  | { kind: "done"; gw: number }
+  | { kind: "error"; message: string };
+
 export function SettingsView(props: Props) {
+  const router = useRouter();
   const [copied, setCopied] = useState(false);
   // Local-only toggle state — wired to nothing in MVP per build plan.
   // The screen visually completes the design; persistence comes post-v1.
   const [notifications, setNotifications] = useState(true);
   const [lockAtKickoff, setLockAtKickoff] = useState(true);
+
+  // Admin "unlock a gameweek" control.
+  const [unlockGw, setUnlockGw] = useState(String(props.currentGw));
+  const [unlock, setUnlock] = useState<UnlockState>({ kind: "idle" });
 
   function copyCode() {
     navigator.clipboard.writeText(props.leagueCode).then(
@@ -35,6 +49,34 @@ export function SettingsView(props: Props) {
       },
       () => {},
     );
+  }
+
+  async function onUnlock() {
+    const gw = Number.parseInt(unlockGw, 10);
+    if (!Number.isInteger(gw) || gw < 1 || gw > 38) {
+      setUnlock({ kind: "error", message: "Enter a gameweek between 1 and 38." });
+      return;
+    }
+    if (
+      !window.confirm(
+        `Unlock GW ${gw} for everyone? All players drop back to draft and can edit + re-submit. Scores already entered are kept.`,
+      )
+    ) {
+      return;
+    }
+    setUnlock({ kind: "working" });
+    const res = await fetch("/api/league/unlock-gw", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ leagueId: props.leagueId, gw }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      setUnlock({ kind: "error", message: body.error ?? "Could not unlock" });
+      return;
+    }
+    setUnlock({ kind: "done", gw });
+    router.refresh();
   }
 
   return (
@@ -114,6 +156,55 @@ export function SettingsView(props: Props) {
             onToggle={setLockAtKickoff}
           />
         </section>
+
+        {/* Admin: unlock a gameweek */}
+        {props.isCreator && (
+          <section className="mt-8 border border-border rounded-card p-5 bg-white">
+            <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+              Admin
+            </p>
+            <p className="font-medium mt-1">Unlock a gameweek</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Drops every player in that gameweek back to draft so they can
+              edit and re-submit. Scores already entered are kept.
+            </p>
+            <div className="flex items-center gap-2 mt-3">
+              <Input
+                type="number"
+                min={1}
+                max={38}
+                value={unlockGw}
+                onChange={(e) => {
+                  setUnlockGw(e.target.value);
+                  if (unlock.kind !== "idle") setUnlock({ kind: "idle" });
+                }}
+                className="h-11 w-20 text-center font-mono"
+                aria-label="Gameweek to unlock"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onUnlock}
+                disabled={unlock.kind === "working"}
+                className="h-11 flex-1"
+              >
+                {unlock.kind === "working"
+                  ? "Unlocking…"
+                  : "Unlock gameweek"}
+              </Button>
+            </div>
+            {unlock.kind === "error" && (
+              <p className="text-sm text-destructive mt-2">
+                {unlock.message}
+              </p>
+            )}
+            {unlock.kind === "done" && (
+              <p className="text-sm text-muted-foreground mt-2">
+                GW {unlock.gw} unlocked — everyone can edit + re-submit.
+              </p>
+            )}
+          </section>
+        )}
 
         {/* Sign out */}
         <form action="/auth/signout" method="post" className="mt-10">
