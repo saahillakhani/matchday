@@ -80,8 +80,21 @@ export async function GET(request: Request) {
     isStarter: isStarter(rotationIds, uid),
   }));
 
+  // Who has submitted this GW. A user's picks only become visible to
+  // players below them once they've submitted — a saved draft stays
+  // private.
+  const { data: subs } = await supabase
+    .from("submissions")
+    .select("user_id")
+    .eq("league_id", leagueId)
+    .eq("gw", gw);
+  const submittedIds = new Set(
+    (subs ?? []).map((s) => s.user_id).filter((id): id is string => !!id),
+  );
+
   // Determine visibility. Past or locked GWs reveal everyone's picks; the
-  // current open GW reveals only users above me in the rotation (plus me).
+  // current open GW reveals users above me in rotation who have SUBMITTED,
+  // plus me (I always see my own, submitted or draft).
   const isPastGw = gw < league.current_gw;
   const locked = league.locked || isPastGw;
 
@@ -89,13 +102,10 @@ export async function GET(request: Request) {
   if (locked) {
     visibleIds = Array.from(nameByUserId.keys());
   } else {
-    visibleIds = [...visibleUserIds(rotationIds, user.id), user.id];
-  }
-
-  // If the league hasn't locked yet, base_order is empty and the rotation
-  // is []. We still let the caller see their own picks in that case.
-  if (rotationIds.length === 0 && !visibleIds.includes(user.id)) {
-    visibleIds.push(user.id);
+    const above = visibleUserIds(rotationIds, user.id).filter((id) =>
+      submittedIds.has(id),
+    );
+    visibleIds = [...above, user.id];
   }
 
   const { data: predictions } =

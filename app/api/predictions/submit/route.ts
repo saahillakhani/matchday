@@ -41,11 +41,8 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  if (picks.length === 0) {
-    return NextResponse.json({ ok: true });
-  }
 
-  // RLS gates this: non-members and non-creators get nothing.
+  // RLS gates this — non-members get nothing.
   const { data: league } = await supabase
     .from("leagues")
     .select("id, selected_teams")
@@ -59,9 +56,8 @@ export async function POST(request: Request) {
     );
   }
 
-  // Once a user has submitted this GW, their picks are locked. They must
-  // ask the league admin to unlock the gameweek to edit again.
-  const { data: submission } = await supabase
+  // Already submitted? Locked.
+  const { data: existing } = await supabase
     .from("submissions")
     .select("id")
     .eq("league_id", leagueId)
@@ -69,15 +65,14 @@ export async function POST(request: Request) {
     .eq("gw", gw)
     .maybeSingle();
 
-  if (submission) {
+  if (existing) {
     return NextResponse.json(
-      { error: "You've already submitted this gameweek — it's locked." },
+      { error: "You've already submitted this gameweek." },
       { status: 403 },
     );
   }
 
-  // Compute the GW's fixtures from the same source the cron and the
-  // fixtures route use, so match_index numbers line up across all writes.
+  // Same fixture computation as everywhere else.
   const fplFixtures = await getFixtures(gw);
   const relevant = filterByTeams(fplFixtures, league.selected_teams);
   const sorted = sortFixtures(relevant);
@@ -89,8 +84,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // Hard gate: once the first kickoff passes, no edits — even if the cron
-  // hasn't yet flipped the leagues.locked flag.
+  // No edits after kickoff.
   const firstKickoff = sorted[0].kickoffTime;
   if (firstKickoff && new Date(firstKickoff) <= new Date()) {
     return NextResponse.json(
@@ -99,20 +93,22 @@ export async function POST(request: Request) {
     );
   }
 
-  // Validate every match_index is in range; reject the whole batch on
-  // mismatch so we never write a partial mis-aligned set.
-  const maxIndex = sorted.length - 1;
-  for (const pick of picks) {
-    if (pick.matchIndex < 0 || pick.matchIndex > maxIndex) {
-      return NextResponse.json(
-        {
-          error: `matchIndex ${pick.matchIndex} out of range (0–${maxIndex})`,
-        },
-        { status: 400 },
-      );
-    }
+  // Submit requires a COMPLETE set: one valid pick per fixture.
+  const expectedIndexes = new Set(sorted.map((f) => f.matchIndex));
+  const providedIndexes = new Set(picks.map((p) => p.matchIndex));
+  if (
+    picks.length !== sorted.length ||
+    [...expectedIndexes].some((i) => !providedIndexes.has(i))
+  ) {
+    return NextResponse.json(
+      {
+        error: `Fill in all ${sorted.length} scores before submitting.`,
+      },
+      { status: 400 },
+    );
   }
 
+  // Persist the picks, then record the submission.
   const rows = picks.map((p) => ({
     league_id: leagueId,
     user_id: user.id,
@@ -127,8 +123,21 @@ export async function POST(request: Request) {
     .upsert(rows, { onConflict: "league_id,user_id,gw,match_index" });
 
   if (upsertError) {
-    console.error("[predictions] upsert failed:", upsertError);
+    console.error("[predictions/submit] upsert failed:", upsertError);
     return NextResponse.json({ error: upsertError.message }, { status: 500 });
+  }
+
+  const { error: submitError } = await supabase
+    .from("submissions")
+    .insert({ league_id: leagueId, user_id: user.id, gw });
+
+  if (submitError) {
+    // 23505 = unique violation = a concurrent submit already landed.
+    if ((submitError as { code?: string }).code === "23505") {
+      return NextResponse.json({ ok: true });
+    }
+    console.error("[predictions/submit] submission insert failed:", submitError);
+    return NextResponse.json({ error: submitError.message }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });

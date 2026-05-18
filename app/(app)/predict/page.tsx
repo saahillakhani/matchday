@@ -27,7 +27,9 @@ export default async function PredictPage({
   // RLS gates this — non-members get nothing and we send them home.
   const { data: league } = await supabase
     .from("leagues")
-    .select("id, name, code, selected_teams, current_gw, locked, base_order")
+    .select(
+      "id, name, code, selected_teams, current_gw, locked, base_order, created_by",
+    )
     .eq("id", leagueId)
     .single();
 
@@ -60,20 +62,25 @@ export default async function PredictPage({
     profiles: { display_name: string } | null;
   };
 
-  const [{ data: gwPicks }, { data: membersData }] = await Promise.all([
-    supabase
-      .from("predictions")
-      .select("user_id, match_index, home_score, away_score")
-      .eq("league_id", leagueId)
-      .eq("gw", gw),
-    supabase
-      .from("league_members")
-      .select("user_id, profiles(display_name)")
-      .eq("league_id", leagueId),
-  ]);
+  const [{ data: gwPicks }, { data: membersData }, { data: gwSubs }] =
+    await Promise.all([
+      supabase
+        .from("predictions")
+        .select("user_id, match_index, home_score, away_score")
+        .eq("league_id", leagueId)
+        .eq("gw", gw),
+      supabase
+        .from("league_members")
+        .select("user_id, profiles(display_name)")
+        .eq("league_id", leagueId),
+      supabase
+        .from("submissions")
+        .select("user_id")
+        .eq("league_id", leagueId)
+        .eq("gw", gw),
+    ]);
 
   const existingPicks: Record<number, { home: number; away: number }> = {};
-  const pickCountByUser = new Map<string, number>();
   for (const row of gwPicks ?? []) {
     if (row.home_score === null || row.away_score === null) continue;
     if (row.user_id === user.id) {
@@ -81,12 +88,6 @@ export default async function PredictPage({
         home: row.home_score,
         away: row.away_score,
       };
-    }
-    if (row.user_id) {
-      pickCountByUser.set(
-        row.user_id,
-        (pickCountByUser.get(row.user_id) ?? 0) + 1,
-      );
     }
   }
 
@@ -97,18 +98,18 @@ export default async function PredictPage({
     }
   }
 
-  // Rotation for this GW. "On the clock" = the first member in rotation
-  // order who hasn't filled in all their picks yet. None once everyone's
-  // submitted a full set.
+  const submittedIds = new Set(
+    (gwSubs ?? []).map((s) => s.user_id).filter((id): id is string => !!id),
+  );
+  const iHaveSubmitted = submittedIds.has(user.id);
+
+  // Rotation for this GW. "On the clock" = first member in rotation order
+  // who hasn't SUBMITTED yet. No marker on a locked GW.
   const baseOrder = (league.base_order ?? []) as string[];
   const rotationIds = rotationForGw(baseOrder, gw);
-  const fixtureCount = sorted.length;
-  const onClockId =
-    fixtureCount > 0
-      ? rotationIds.find(
-          (uid) => (pickCountByUser.get(uid) ?? 0) < fixtureCount,
-        ) ?? null
-      : null;
+  const onClockId = locked
+    ? null
+    : rotationIds.find((uid) => !submittedIds.has(uid)) ?? null;
 
   const rotation = rotationIds.map((uid) => ({
     userId: uid,
@@ -126,6 +127,8 @@ export default async function PredictPage({
       currentGw={league.current_gw}
       selectedGw={gw}
       locked={locked}
+      submitted={iHaveSubmitted}
+      isAdmin={league.created_by === user.id}
       firstKickoff={firstKickoff}
       rotation={rotation}
       fixtures={sorted.map((f) => ({

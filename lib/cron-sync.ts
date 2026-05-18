@@ -149,11 +149,24 @@ export async function syncLeague(
       .from("leagues")
       .update({ base_order: baseOrder, locked: true })
       .eq("id", league.id);
+
+    // Auto-submit at kickoff: anyone who saved draft picks for this GW but
+    // never pressed Submit gets an auto submission so they don't miss out.
+    const autoSubmitted = await autoSubmitDrafts(
+      supabase,
+      league.id,
+      league.current_gw,
+      memberIds,
+    );
+
     return {
       leagueId: league.id,
       fromGw,
       action: "locked",
-      details: { memberCount: memberIds.length },
+      details: {
+        memberCount: memberIds.length,
+        autoSubmitted,
+      },
     };
   }
 
@@ -220,4 +233,61 @@ export async function syncLeague(
   }
 
   return { leagueId: league.id, fromGw, action: "noop" };
+}
+
+/**
+ * At kickoff, auto-submit anyone who saved draft picks for the GW but
+ * never pressed Submit. Returns the count of users auto-submitted.
+ * Idempotent — uses upsert on the submissions unique key.
+ */
+async function autoSubmitDrafts(
+  supabase: SupabaseClient<Database>,
+  leagueId: string,
+  gw: number,
+  memberIds: string[],
+): Promise<number> {
+  // Members with at least one prediction for this GW.
+  const { data: predRows } = await supabase
+    .from("predictions")
+    .select("user_id")
+    .eq("league_id", leagueId)
+    .eq("gw", gw);
+  const withPicks = new Set(
+    (predRows ?? [])
+      .map((r) => r.user_id)
+      .filter((id): id is string => !!id),
+  );
+
+  // Members who already have a submission for this GW.
+  const { data: subRows } = await supabase
+    .from("submissions")
+    .select("user_id")
+    .eq("league_id", leagueId)
+    .eq("gw", gw);
+  const alreadySubmitted = new Set(
+    (subRows ?? [])
+      .map((r) => r.user_id)
+      .filter((id): id is string => !!id),
+  );
+
+  const toAutoSubmit = memberIds.filter(
+    (id) => withPicks.has(id) && !alreadySubmitted.has(id),
+  );
+  if (toAutoSubmit.length === 0) return 0;
+
+  const { error } = await supabase.from("submissions").upsert(
+    toAutoSubmit.map((userId) => ({
+      league_id: leagueId,
+      user_id: userId,
+      gw,
+      auto: true,
+    })),
+    { onConflict: "league_id,user_id,gw" },
+  );
+  if (error) {
+    throw new Error(
+      `Auto-submit failed for league ${leagueId} gw ${gw}: ${error.message}`,
+    );
+  }
+  return toAutoSubmit.length;
 }

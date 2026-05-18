@@ -201,6 +201,48 @@ export type Database = {
           },
         ]
       }
+      submissions: {
+        Row: {
+          auto: boolean
+          gw: number
+          id: string
+          league_id: string | null
+          submitted_at: string
+          user_id: string | null
+        }
+        Insert: {
+          auto?: boolean
+          gw: number
+          id?: string
+          league_id?: string | null
+          submitted_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          auto?: boolean
+          gw?: number
+          id?: string
+          league_id?: string | null
+          submitted_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "submissions_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "submissions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

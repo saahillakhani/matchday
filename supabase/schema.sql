@@ -174,12 +174,48 @@ revoke all on function public.get_league_by_code(text) from public;
 grant execute on function public.get_league_by_code(text) to anon, authenticated;
 
 
+-- ── 6b. Submissions (Save vs Submit) ──────────────────────────
+-- One row per (league, user, gw) once a user SUBMITS their picks.
+-- Saving leaves predictions as a private draft with no row here.
+-- Submitting reveals the picks down-rotation, moves the "on the clock"
+-- marker, and locks the user for that gw. `auto` marks rows the cron
+-- created at kickoff for players who never pressed Submit.
+
+create table submissions (
+  id           uuid primary key default gen_random_uuid(),
+  league_id    uuid references leagues(id) on delete cascade,
+  user_id      uuid references profiles(id) on delete cascade,
+  gw           int not null,
+  submitted_at timestamptz not null default now(),
+  auto         boolean not null default false,
+  unique (league_id, user_id, gw)
+);
+
+create index submissions_league_gw_idx on submissions(league_id, gw);
+
+alter table submissions enable row level security;
+
+create policy "submissions_read" on submissions for select
+  using (league_id in (select public.user_league_ids()));
+create policy "submissions_insert" on submissions for insert
+  with check (user_id = auth.uid());
+create policy "submissions_delete" on submissions for delete
+  using (
+    exists (
+      select 1 from leagues
+      where leagues.id = submissions.league_id
+      and   leagues.created_by = auth.uid()
+    )
+  );
+
+
 -- ── 7. Realtime ───────────────────────────────────────────────
--- Subscribe to predictions + results so the UI updates live.
+-- Subscribe to predictions + results + submissions so the UI updates live.
 
 alter publication supabase_realtime add table predictions;
 alter publication supabase_realtime add table results;
 alter publication supabase_realtime add table league_members;
+alter publication supabase_realtime add table submissions;
 
 
 -- ── 8. Auto-create profile on sign-up ─────────────────────────

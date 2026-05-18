@@ -28,8 +28,6 @@ type RotationEntry = {
   isStarter: boolean;
 };
 
-// The page computes the rotation server-side and also flags who is "on
-// the clock" (first member yet to complete their picks).
 type RotationChip = RotationEntry & { isOnClock: boolean };
 
 type EveryonePayload = {
@@ -46,16 +44,23 @@ type Props = {
   leagueName: string;
   currentGw: number;
   selectedGw: number;
+  /** Kickoff has passed — hard lock, nobody edits. */
   locked: boolean;
+  /** The current user has submitted this GW. */
+  submitted: boolean;
+  /** The current user is the league creator (can unlock a GW). */
+  isAdmin: boolean;
   firstKickoff: string | null;
   rotation: RotationChip[];
   fixtures: Fixture[];
   existingPicks: Record<number, { home: number; away: number }>;
 };
 
-type SaveState =
+type ActionState =
   | { kind: "idle" }
   | { kind: "saving" }
+  | { kind: "submitting" }
+  | { kind: "unlocking" }
   | { kind: "saved" }
   | { kind: "error"; message: string };
 
@@ -71,7 +76,7 @@ export function PredictForm(props: Props) {
   const [picks, setPicks] = useState<Record<number, Pick>>(() =>
     initialPicks(props.fixtures, props.existingPicks),
   );
-  const [state, setState] = useState<SaveState>({ kind: "idle" });
+  const [state, setState] = useState<ActionState>({ kind: "idle" });
   const [everyone, setEveryone] = useState<EveryoneState>({ kind: "idle" });
 
   // Reset local state when the user switches to a different GW.
@@ -80,6 +85,28 @@ export function PredictForm(props: Props) {
     setState({ kind: "idle" });
     setEveryone({ kind: "idle" });
   }, [props.selectedGw, props.fixtures, props.existingPicks]);
+
+  // Live-refresh the page when anyone submits — keeps the rotation marker
+  // and locked state current on both tabs.
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`predict-subs:${props.leagueId}:${props.selectedGw}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "submissions",
+          filter: `league_id=eq.${props.leagueId}`,
+        },
+        () => router.refresh(),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [props.leagueId, props.selectedGw, router]);
 
   const fetchEveryone = useCallback(async () => {
     const params = new URLSearchParams({
@@ -99,7 +126,7 @@ export function PredictForm(props: Props) {
     setEveryone({ kind: "loaded", data });
   }, [props.leagueId, props.selectedGw]);
 
-  // Lazy-load the Everyone view + subscribe to realtime updates.
+  // Lazy-load the Everyone view + subscribe to realtime pick/submit updates.
   useEffect(() => {
     if (tab !== "everyone") return;
     setEveryone({ kind: "loading" });
@@ -116,9 +143,17 @@ export function PredictForm(props: Props) {
           table: "predictions",
           filter: `league_id=eq.${props.leagueId}`,
         },
-        () => {
-          fetchEveryone();
+        () => fetchEveryone(),
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "submissions",
+          filter: `league_id=eq.${props.leagueId}`,
         },
+        () => fetchEveryone(),
       )
       .subscribe();
 
@@ -144,23 +179,25 @@ export function PredictForm(props: Props) {
     if (state.kind !== "idle") setState({ kind: "idle" });
   }
 
-  async function onSave() {
-    const toSave = Object.entries(picks)
+  function filledPicks() {
+    return Object.entries(picks)
       .filter(([, p]) => p.home !== null && p.away !== null)
       .map(([idx, p]) => ({
         matchIndex: Number.parseInt(idx, 10),
         home: p.home!,
         away: p.away!,
       }));
+  }
 
+  async function onSave() {
+    const toSave = filledPicks();
     if (toSave.length === 0) {
       setState({
         kind: "error",
-        message: "Add at least one pick before saving.",
+        message: "Add at least one score before saving.",
       });
       return;
     }
-
     setState({ kind: "saving" });
     const res = await fetch("/api/predictions", {
       method: "POST",
@@ -171,24 +208,70 @@ export function PredictForm(props: Props) {
         picks: toSave,
       }),
     });
-
     if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as {
-        error?: string;
-      };
-      setState({
-        kind: "error",
-        message: body.error ?? "Could not save picks",
-      });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      setState({ kind: "error", message: body.error ?? "Could not save" });
       return;
     }
     setState({ kind: "saved" });
     router.refresh();
   }
 
-  const filledCount = Object.values(picks).filter(
-    (p) => p.home !== null && p.away !== null,
-  ).length;
+  async function onSubmit() {
+    const toSubmit = filledPicks();
+    if (toSubmit.length !== props.fixtures.length) {
+      setState({
+        kind: "error",
+        message: `Fill in all ${props.fixtures.length} scores before submitting.`,
+      });
+      return;
+    }
+    setState({ kind: "submitting" });
+    const res = await fetch("/api/predictions/submit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        leagueId: props.leagueId,
+        gw: props.selectedGw,
+        picks: toSubmit,
+      }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      setState({ kind: "error", message: body.error ?? "Could not submit" });
+      return;
+    }
+    setState({ kind: "idle" });
+    router.refresh();
+  }
+
+  async function onUnlock() {
+    if (
+      !window.confirm(
+        "Unlock this gameweek for everyone? All players drop back to draft and can edit + re-submit. Scores already entered are kept.",
+      )
+    ) {
+      return;
+    }
+    setState({ kind: "unlocking" });
+    const res = await fetch("/api/league/unlock-gw", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        leagueId: props.leagueId,
+        gw: props.selectedGw,
+      }),
+    });
+    if (!res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      setState({ kind: "error", message: body.error ?? "Could not unlock" });
+      return;
+    }
+    setState({ kind: "idle" });
+    router.refresh();
+  }
+
+  const filledCount = filledPicks().length;
   const total = props.fixtures.length;
 
   return (
@@ -209,8 +292,8 @@ export function PredictForm(props: Props) {
           Predict
         </h1>
         <p className="text-sm text-muted-foreground italic mt-3">
-          Lock in your picks any time before kickoff. You&apos;ll see picks
-          above you in rotation as they come in.
+          Save a draft as you go. Submitting locks your picks in and reveals
+          them to players below you in the rotation.
         </p>
 
         <div className="mt-6">
@@ -227,8 +310,7 @@ export function PredictForm(props: Props) {
 
         <Tabs tab={tab} onChange={setTab} />
 
-        {/* Rotation player chips — shown on both tabs. The accent ring +
-            dot marks whoever is on the clock for this gameweek. */}
+        {/* Rotation chips — both tabs. Green dot marks who's on the clock. */}
         {props.rotation.length > 0 && (
           <div className="mt-4 flex gap-2 overflow-x-auto pb-1 scrollbar-none">
             {props.rotation.map((p) => (
@@ -249,9 +331,13 @@ export function PredictForm(props: Props) {
             filledCount={filledCount}
             total={total}
             locked={props.locked}
-            saveState={state}
+            submitted={props.submitted}
+            isAdmin={props.isAdmin}
+            state={state}
             onPickChange={handlePickChange}
             onSave={onSave}
+            onSubmit={onSubmit}
+            onUnlock={onUnlock}
           />
         ) : (
           <EveryoneView
@@ -305,9 +391,13 @@ function MyPicks({
   filledCount,
   total,
   locked,
-  saveState,
+  submitted,
+  isAdmin,
+  state,
   onPickChange,
   onSave,
+  onSubmit,
+  onUnlock,
 }: {
   fixtures: Fixture[];
   picks: Record<number, Pick>;
@@ -315,9 +405,13 @@ function MyPicks({
   filledCount: number;
   total: number;
   locked: boolean;
-  saveState: SaveState;
+  submitted: boolean;
+  isAdmin: boolean;
+  state: ActionState;
   onPickChange: (matchIndex: number, h: number | null, a: number | null) => void;
   onSave: () => void;
+  onSubmit: () => void;
+  onUnlock: () => void;
 }) {
   if (total === 0) {
     return (
@@ -329,6 +423,10 @@ function MyPicks({
     );
   }
 
+  // Inputs are read-only once the user has submitted or kickoff has passed.
+  const readOnly = locked || submitted;
+  const errorMsg = state.kind === "error" ? state.message : null;
+
   return (
     <>
       <div className="mt-6 flex items-center justify-between border border-dashed border-border rounded-card px-3 py-2 text-xs font-mono uppercase tracking-widest text-muted-foreground">
@@ -336,9 +434,7 @@ function MyPicks({
           {filledCount} / {total} scores in
         </span>
         {firstKickoff && (
-          <span>
-            {locked ? "locked" : formatStartsAt(firstKickoff)}
-          </span>
+          <span>{locked ? "locked" : formatStartsAt(firstKickoff)}</span>
         )}
       </div>
 
@@ -352,41 +448,87 @@ function MyPicks({
             predictedHome={picks[f.matchIndex]?.home ?? null}
             predictedAway={picks[f.matchIndex]?.away ?? null}
             onChange={(h, a) => onPickChange(f.matchIndex, h, a)}
-            disabled={locked}
+            disabled={readOnly}
           />
         ))}
       </div>
 
-      {!locked ? (
-        <div className="mt-6 space-y-2">
-          <Button
-            type="button"
-            onClick={onSave}
-            disabled={saveState.kind === "saving"}
-            className="w-full h-12"
-          >
-            {saveState.kind === "saving" ? "Saving…" : "Save picks"}
-          </Button>
-          {saveState.kind === "error" && (
-            <p className="text-sm text-destructive text-center">
-              {saveState.message}
-            </p>
-          )}
-          {saveState.kind === "saved" && (
-            <p className="text-sm text-muted-foreground text-center">
-              Saved ✓
-            </p>
-          )}
-        </div>
-      ) : (
+      {locked ? (
         <div className="mt-6 border border-destructive/30 rounded-card px-4 py-3">
           <p className="text-sm text-destructive font-medium">● Locked</p>
           <p className="text-sm text-muted-foreground mt-1">
             Kickoff has passed. Picks are sealed.
           </p>
         </div>
+      ) : submitted ? (
+        <div className="mt-6 space-y-3">
+          <div className="border border-accent/30 bg-accent/5 rounded-card px-4 py-3">
+            <p className="text-sm font-medium text-accent-green">
+              Submitted ✓
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Your picks are locked for this gameweek. Ask the league admin to
+              unlock it if you need to change them.
+            </p>
+          </div>
+          {isAdmin && (
+            <AdminUnlock state={state} onUnlock={onUnlock} />
+          )}
+        </div>
+      ) : (
+        <div className="mt-6 space-y-2">
+          <Button
+            type="button"
+            onClick={onSubmit}
+            disabled={
+              state.kind === "submitting" || state.kind === "saving"
+            }
+            className="w-full h-12"
+          >
+            {state.kind === "submitting" ? "Submitting…" : "Submit picks"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onSave}
+            disabled={state.kind === "saving" || state.kind === "submitting"}
+            className="w-full h-11"
+          >
+            {state.kind === "saving" ? "Saving…" : "Save draft"}
+          </Button>
+          {errorMsg && (
+            <p className="text-sm text-destructive text-center">{errorMsg}</p>
+          )}
+          {state.kind === "saved" && (
+            <p className="text-sm text-muted-foreground text-center">
+              Draft saved ✓ — not submitted yet.
+            </p>
+          )}
+          {isAdmin && <AdminUnlock state={state} onUnlock={onUnlock} />}
+        </div>
       )}
     </>
+  );
+}
+
+function AdminUnlock({
+  state,
+  onUnlock,
+}: {
+  state: ActionState;
+  onUnlock: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onUnlock}
+      disabled={state.kind === "unlocking"}
+      className="w-full text-xs uppercase tracking-widest text-muted-foreground hover:text-destructive disabled:opacity-50 py-2"
+    >
+      {state.kind === "unlocking"
+        ? "Unlocking…"
+        : "Unlock gameweek for everyone (admin)"}
+    </button>
   );
 }
 
