@@ -235,7 +235,6 @@ export function PredictForm(props: Props) {
               <PlayerChip
                 key={p.userId}
                 displayName={p.displayName}
-                isStarter={p.isStarter}
                 isOnClock={p.isOnClock}
               />
             ))}
