@@ -233,8 +233,7 @@ function FormGrid({ players }: { players: Player[] }) {
         Form · {range}
       </p>
       <p className="text-xs italic text-muted-foreground mt-1">
-        Bars show points per gameweek. Green = player&apos;s best. Outlined
-        column is the live GW.
+        Bars show points per gameweek. Green = player&apos;s best.
       </p>
 
       <div className="mt-6 space-y-5">

@@ -77,9 +77,6 @@ export function FormBars({
                 height={h}
                 rx={2}
                 fill={fill}
-                stroke={b.isLive ? "#0A0A0A" : "none"}
-                strokeWidth={b.isLive ? 1 : 0}
-                strokeDasharray={b.isLive && b.points === 0 ? "2 2" : undefined}
               >
                 <title>{`GW ${b.gw}: ${b.points} pts`}</title>
               </rect>

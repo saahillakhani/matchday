@@ -2,6 +2,11 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getFixtures } from "@/lib/fpl";
 import { filterByTeams, sortFixtures } from "@/lib/match-key";
+import {
+  abbreviateName,
+  isStarter,
+  rotationForGw,
+} from "@/lib/rotation";
 import { PredictForm } from "./form";
 
 export default async function PredictPage({
@@ -22,7 +27,7 @@ export default async function PredictPage({
   // RLS gates this — non-members get nothing and we send them home.
   const { data: league } = await supabase
     .from("leagues")
-    .select("id, name, code, selected_teams, current_gw, locked")
+    .select("id, name, code, selected_teams, current_gw, locked, base_order")
     .eq("id", leagueId)
     .single();
 
@@ -47,22 +52,71 @@ export default async function PredictPage({
   const isCurrentOrPastGw = gw <= league.current_gw;
   const locked = isCurrentOrPastGw && (league.locked || kickoffPassed);
 
-  const { data: picksData } = await supabase
-    .from("predictions")
-    .select("match_index, home_score, away_score")
-    .eq("league_id", leagueId)
-    .eq("user_id", user.id)
-    .eq("gw", gw);
+  // Fetch every member's picks for this GW (one league/GW worth of rows —
+  // well under any row cap) plus the member roster, so we can render the
+  // rotation chips and work out who's still "on the clock".
+  type MemberRow = {
+    user_id: string | null;
+    profiles: { display_name: string } | null;
+  };
+
+  const [{ data: gwPicks }, { data: membersData }] = await Promise.all([
+    supabase
+      .from("predictions")
+      .select("user_id, match_index, home_score, away_score")
+      .eq("league_id", leagueId)
+      .eq("gw", gw),
+    supabase
+      .from("league_members")
+      .select("user_id, profiles(display_name)")
+      .eq("league_id", leagueId),
+  ]);
 
   const existingPicks: Record<number, { home: number; away: number }> = {};
-  for (const row of picksData ?? []) {
-    if (row.home_score !== null && row.away_score !== null) {
+  const pickCountByUser = new Map<string, number>();
+  for (const row of gwPicks ?? []) {
+    if (row.home_score === null || row.away_score === null) continue;
+    if (row.user_id === user.id) {
       existingPicks[row.match_index] = {
         home: row.home_score,
         away: row.away_score,
       };
     }
+    if (row.user_id) {
+      pickCountByUser.set(
+        row.user_id,
+        (pickCountByUser.get(row.user_id) ?? 0) + 1,
+      );
+    }
   }
+
+  const nameByUserId = new Map<string, string>();
+  for (const m of (membersData ?? []) as MemberRow[]) {
+    if (m.user_id) {
+      nameByUserId.set(m.user_id, m.profiles?.display_name ?? "—");
+    }
+  }
+
+  // Rotation for this GW. "On the clock" = the first member in rotation
+  // order who hasn't filled in all their picks yet. None once everyone's
+  // submitted a full set.
+  const baseOrder = (league.base_order ?? []) as string[];
+  const rotationIds = rotationForGw(baseOrder, gw);
+  const fixtureCount = sorted.length;
+  const onClockId =
+    fixtureCount > 0
+      ? rotationIds.find(
+          (uid) => (pickCountByUser.get(uid) ?? 0) < fixtureCount,
+        ) ?? null
+      : null;
+
+  const rotation = rotationIds.map((uid) => ({
+    userId: uid,
+    displayName: nameByUserId.get(uid) ?? "—",
+    abbr: abbreviateName(nameByUserId.get(uid) ?? "—"),
+    isStarter: isStarter(rotationIds, uid),
+    isOnClock: uid === onClockId,
+  }));
 
   return (
     <PredictForm
@@ -73,6 +127,7 @@ export default async function PredictPage({
       selectedGw={gw}
       locked={locked}
       firstKickoff={firstKickoff}
+      rotation={rotation}
       fixtures={sorted.map((f) => ({
         matchIndex: f.matchIndex,
         home: f.homeTeam,

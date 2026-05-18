@@ -71,6 +71,31 @@ const FALLBACK_TEAMS = [
   "Wolves",
 ];
 
+// ── Fetch with retry ──────────────────────────────────────────────
+
+// FPL's public API is occasionally flaky (timeouts, brief 5xx). A few
+// retries with backoff turns "page renders empty" into "page renders a
+// beat later". 3 attempts, ~300ms / 600ms gaps.
+async function fetchJsonWithRetry<T>(
+  url: string,
+  attempts = 3,
+): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error(`FPL ${res.status}`);
+      return (await res.json()) as T;
+    } catch (err) {
+      lastErr = err;
+      if (i < attempts - 1) {
+        await new Promise((r) => setTimeout(r, 300 * (i + 1)));
+      }
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error("FPL fetch failed");
+}
+
 // ── Bootstrap cache ───────────────────────────────────────────────
 
 let bootstrapCache: { data: Bootstrap; fetchedAt: number } | null = null;
@@ -87,15 +112,14 @@ async function fetchBootstrap(): Promise<Bootstrap | null> {
 
   bootstrapInflight = (async () => {
     try {
-      const res = await fetch(`${FPL_BASE}/bootstrap-static/`, {
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error(`FPL ${res.status}`);
-      const data = (await res.json()) as Bootstrap;
+      const data = await fetchJsonWithRetry<Bootstrap>(
+        `${FPL_BASE}/bootstrap-static/`,
+      );
       bootstrapCache = { data, fetchedAt: Date.now() };
       return data;
     } catch {
-      return null;
+      // Serve a stale cache rather than nothing, if we ever had one.
+      return bootstrapCache?.data ?? null;
     } finally {
       bootstrapInflight = null;
     }
@@ -120,15 +144,14 @@ async function fetchFixturesByGw(gw: number): Promise<FplFixture[] | null> {
 
   const promise = (async () => {
     try {
-      const res = await fetch(`${FPL_BASE}/fixtures/?event=${gw}`, {
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error(`FPL ${res.status}`);
-      const data = (await res.json()) as FplFixture[];
+      const data = await fetchJsonWithRetry<FplFixture[]>(
+        `${FPL_BASE}/fixtures/?event=${gw}`,
+      );
       fixturesCache.set(gw, { data, fetchedAt: Date.now() });
       return data;
     } catch {
-      return null;
+      // Fall back to a stale cache for this GW if we have one.
+      return fixturesCache.get(gw)?.data ?? null;
     } finally {
       fixturesInflight.delete(gw);
     }

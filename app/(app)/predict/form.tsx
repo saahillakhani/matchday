@@ -28,6 +28,10 @@ type RotationEntry = {
   isStarter: boolean;
 };
 
+// The page computes the rotation server-side and also flags who is "on
+// the clock" (first member yet to complete their picks).
+type RotationChip = RotationEntry & { isOnClock: boolean };
+
 type EveryonePayload = {
   rotation: RotationEntry[];
   picks: Record<string, Record<number, { home: number; away: number }>>;
@@ -44,6 +48,7 @@ type Props = {
   selectedGw: number;
   locked: boolean;
   firstKickoff: string | null;
+  rotation: RotationChip[];
   fixtures: Fixture[];
   existingPicks: Record<number, { home: number; away: number }>;
 };
@@ -186,9 +191,6 @@ export function PredictForm(props: Props) {
   ).length;
   const total = props.fixtures.length;
 
-  const rotation =
-    everyone.kind === "loaded" ? everyone.data.rotation : [];
-
   return (
     <main className="min-h-screen bg-background px-5 py-8 sm:py-12">
       <div className="max-w-xl mx-auto">
@@ -225,14 +227,16 @@ export function PredictForm(props: Props) {
 
         <Tabs tab={tab} onChange={setTab} />
 
-        {/* Rotation player chips — only visible on Everyone's Picks tab */}
-        {tab === "everyone" && rotation.length > 0 && (
+        {/* Rotation player chips — shown on both tabs. The accent ring +
+            dot marks whoever is on the clock for this gameweek. */}
+        {props.rotation.length > 0 && (
           <div className="mt-4 flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-            {rotation.map((p) => (
+            {props.rotation.map((p) => (
               <PlayerChip
                 key={p.userId}
                 displayName={p.displayName}
                 isStarter={p.isStarter}
+                isOnClock={p.isOnClock}
               />
             ))}
           </div>
