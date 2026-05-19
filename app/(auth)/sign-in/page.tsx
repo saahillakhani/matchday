@@ -105,7 +105,7 @@ export default function SignInPage() {
           <p className="text-sm text-center text-muted-foreground">
             New here?{" "}
             <a
-              href="/how-to-play"
+              href="/how-to-play?from=/sign-in"
               className="text-foreground font-medium underline"
             >
               How it works →

@@ -5,12 +5,22 @@ export const metadata = {
   title: "How to play · The Matchday",
 };
 
-export default function HowToPlayPage() {
+export default function HowToPlayPage({
+  searchParams,
+}: {
+  searchParams: { from?: string };
+}) {
+  // Return to wherever the reader came from. Only honour internal paths
+  // (start with a single "/") so the param can't become an open redirect.
+  const raw = searchParams.from ?? "";
+  const backHref =
+    raw.startsWith("/") && !raw.startsWith("//") ? raw : "/";
+
   return (
     <main className="min-h-screen bg-background px-5 py-8 sm:py-12">
       <div className="max-w-xl mx-auto">
         <Link
-          href="/"
+          href={backHref}
           className="inline-flex items-center gap-1 text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="w-3 h-3" />
@@ -99,7 +109,7 @@ export default function HowToPlayPage() {
 
         <div className="mt-10 border-t border-border pt-6">
           <Link
-            href="/"
+            href={backHref}
             className="text-sm font-medium underline underline-offset-4"
           >
             Got it — take me back →

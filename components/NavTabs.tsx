@@ -61,7 +61,7 @@ export function NavTabs({
         );
       })}
       <Link
-        href="/how-to-play"
+        href={`/how-to-play?from=${encodeURIComponent(hrefFor(current, leagueId))}`}
         aria-label="How to play"
         className="ml-auto pb-2 -mb-px text-muted-foreground hover:text-foreground transition-colors"
       >
