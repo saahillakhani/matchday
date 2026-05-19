@@ -104,7 +104,7 @@ export async function syncLeague(
   now: Date,
 ): Promise<SyncReport> {
   const fromGw = league.current_gw;
-  const { all, finished } = await fixtureSource(league.current_gw);
+  const { all } = await fixtureSource(league.current_gw);
 
   // a. Filter + sort to this league's relevant fixtures
   const relevant = filterByTeams(all, league.selected_teams);
@@ -177,30 +177,25 @@ export async function syncLeague(
     };
   }
 
-  // c. Upsert results for any finished fixtures
-  const matchIndexByFplId = new Map(
-    sorted.map((f) => [f.fplFixtureId, f.matchIndex]),
-  );
-
-  const resultRows: Array<{
-    league_id: string;
-    gw: number;
-    match_index: number;
-    home_score: number;
-    away_score: number;
-  }> = [];
-
-  for (const f of finished) {
-    const matchIndex = matchIndexByFplId.get(f.fplFixtureId);
-    if (matchIndex === undefined) continue;
-    resultRows.push({
-      league_id: league.id,
-      gw: league.current_gw,
-      match_index: matchIndex,
-      home_score: f.homeScore,
-      away_score: f.awayScore,
-    });
-  }
+  // c. Upsert results for finished fixtures — for the current GW AND the
+  //    one before it. The previous GW catches late results (a Monday
+  //    night game, a postponed fixture played out of sequence) that land
+  //    after current_gw has already moved on, which would otherwise
+  //    leave that gameweek permanently missing a result.
+  const resultRows = [
+    ...(await collectResultRows(
+      league.id,
+      league.current_gw,
+      league.selected_teams,
+      fixtureSource,
+    )),
+    ...(await collectResultRows(
+      league.id,
+      league.current_gw - 1,
+      league.selected_teams,
+      fixtureSource,
+    )),
+  ];
 
   if (resultRows.length > 0) {
     const { error: upsertError } = await supabase
@@ -240,6 +235,45 @@ export async function syncLeague(
   }
 
   return { leagueId: league.id, fromGw, action: "noop" };
+}
+
+type ResultRow = {
+  league_id: string;
+  gw: number;
+  match_index: number;
+  home_score: number;
+  away_score: number;
+};
+
+/**
+ * Result rows for a single gameweek — finished fixtures involving the
+ * league's teams, keyed to the same match_index the predictions use.
+ */
+async function collectResultRows(
+  leagueId: string,
+  gw: number,
+  selectedTeams: string[],
+  fixtureSource: FixtureSource,
+): Promise<ResultRow[]> {
+  if (gw < 1) return [];
+  const { all, finished } = await fixtureSource(gw);
+  const sorted = sortFixtures(filterByTeams(all, selectedTeams));
+  const indexByFplId = new Map(
+    sorted.map((f) => [f.fplFixtureId, f.matchIndex]),
+  );
+  const rows: ResultRow[] = [];
+  for (const f of finished) {
+    const matchIndex = indexByFplId.get(f.fplFixtureId);
+    if (matchIndex === undefined) continue;
+    rows.push({
+      league_id: leagueId,
+      gw,
+      match_index: matchIndex,
+      home_score: f.homeScore,
+      away_score: f.awayScore,
+    });
+  }
+  return rows;
 }
 
 /**
