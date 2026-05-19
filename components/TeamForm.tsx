@@ -27,9 +27,11 @@ export function TeamForm({
         align === "right" ? "justify-end" : "justify-start",
       ].join(" ")}
     >
-      {form.map((r) => (
+      {form.map((r, i) => (
+        // Index key: a team can play twice in one GW (double gameweek),
+        // so r.gw isn't unique. The list never reorders, so index is safe.
         <span
-          key={r.gw}
+          key={i}
           title={`GW ${r.gw} · ${r.home ? "Home" : "Away"} · ${
             r.result === "W" ? "Win" : r.result === "L" ? "Loss" : "Draw"
           }`}
