@@ -14,8 +14,8 @@ export async function POST() {
   }
 
   await sendPushToUsers([user.id], {
-    title: "Notifications are on",
-    body: "This is a test — you're all set for The Matchday.",
+    title: "Test push",
+    body: "It works — you're all set for The Matchday.",
     url: "/",
   });
 

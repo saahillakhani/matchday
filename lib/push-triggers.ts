@@ -136,7 +136,7 @@ export async function dispatchSyncNotifications(
             : undefined;
         if (starter) {
           await sendPushToUsers([starter], {
-            title: "You're first up",
+            title: "You're up",
             body: `GW ${nextGw} is open — you're on the clock. Get your predictions in.`,
             url: `/predict?leagueId=${report.leagueId}`,
           });
