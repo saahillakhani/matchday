@@ -7,6 +7,9 @@ import {
   type RawResult,
 } from "@/lib/standings";
 import { fetchAllPredictions } from "@/lib/fetch-all-predictions";
+import { getFixtures } from "@/lib/fpl";
+import { filterByTeams, sortFixtures } from "@/lib/match-key";
+import { buildVerdict } from "@/lib/verdict";
 import { TableView } from "./form";
 
 export default async function TablePage({
@@ -25,7 +28,7 @@ export default async function TablePage({
 
   const { data: league } = await supabase
     .from("leagues")
-    .select("id, name, current_gw")
+    .select("id, name, current_gw, selected_teams")
     .eq("id", leagueId)
     .single();
   if (!league) redirect("/");
@@ -119,6 +122,26 @@ export default async function TablePage({
     };
   });
 
+  // The Verdict — a recap of the most recent gameweek that has results.
+  let verdict = null;
+  if (latestGw !== null) {
+    const fplFixtures = await getFixtures(latestGw);
+    const gwFixtures = sortFixtures(
+      filterByTeams(fplFixtures, league.selected_teams),
+    ).map((f) => ({
+      matchIndex: f.matchIndex,
+      homeTeam: f.homeTeam,
+      awayTeam: f.awayTeam,
+    }));
+    verdict = buildVerdict({
+      members,
+      picks,
+      results,
+      fixtures: gwFixtures,
+      gw: latestGw,
+    });
+  }
+
   return (
     <TableView
       leagueId={league.id}
@@ -126,6 +149,7 @@ export default async function TablePage({
       tableRows={tableRows}
       afterGw={latestGw}
       players={players}
+      verdict={verdict}
     />
   );
 }

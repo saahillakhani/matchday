@@ -34,6 +34,19 @@ type Player = {
   perGw: Bar[];
 };
 
+type Verdict = {
+  gw: number;
+  headline: string;
+  topOfGw: { name: string; points: number; exacts: number } | null;
+  bestPick: { name: string; scoreline: string; fixture: string } | null;
+  worstPick: {
+    name: string;
+    predicted: string;
+    actual: string;
+    fixture: string;
+  } | null;
+};
+
 type View = "table" | "form";
 
 type Props = {
@@ -42,6 +55,7 @@ type Props = {
   tableRows: TableRow[];
   afterGw: number | null;
   players: Player[];
+  verdict: Verdict | null;
 };
 
 export function TableView(props: Props) {
@@ -113,7 +127,9 @@ export function TableView(props: Props) {
           <FormGrid players={props.players} />
         )}
 
-        {/* TODO post-v1: GW Match Report / "The Verdict" block goes here */}
+        {view === "table" && props.verdict && (
+          <VerdictCard verdict={props.verdict} />
+        )}
       </div>
     </main>
   );
@@ -260,5 +276,74 @@ function FormGrid({ players }: { players: Player[] }) {
         ))}
       </div>
     </div>
+  );
+}
+
+function VerdictCard({ verdict }: { verdict: Verdict }) {
+  return (
+    <section className="mt-8 border-t border-border pt-6">
+      <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+        GW {verdict.gw} · The Verdict
+      </p>
+      <p className="font-serif text-xl italic font-medium leading-snug mt-2">
+        {verdict.headline}
+      </p>
+
+      {verdict.topOfGw && (
+        <div className="mt-4 inline-flex items-center gap-2 bg-foreground text-background rounded-full px-3 py-1.5">
+          <span className="text-[10px] uppercase tracking-widest opacity-80">
+            ★ Top of GW
+          </span>
+          <span className="text-sm font-medium">
+            {verdict.topOfGw.name}
+          </span>
+          <span className="font-mono text-sm">
+            {verdict.topOfGw.points} pts
+          </span>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-3 mt-4">
+        <div className="border border-border rounded-card px-4 py-3 bg-white">
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+            Best pick
+          </p>
+          {verdict.bestPick ? (
+            <>
+              <p className="font-medium text-sm mt-1">
+                {verdict.bestPick.name}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {verdict.bestPick.scoreline} · {verdict.bestPick.fixture} ✓
+              </p>
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground italic mt-1">
+              No exact scores this week.
+            </p>
+          )}
+        </div>
+        <div className="border border-border rounded-card px-4 py-3 bg-white">
+          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+            Worst pick
+          </p>
+          {verdict.worstPick ? (
+            <>
+              <p className="font-medium text-sm mt-1">
+                {verdict.worstPick.name}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {verdict.worstPick.predicted} · ended{" "}
+                {verdict.worstPick.actual}
+              </p>
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground italic mt-1">
+              —
+            </p>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
