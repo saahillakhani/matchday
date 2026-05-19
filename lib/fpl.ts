@@ -161,6 +161,39 @@ async function fetchFixturesByGw(gw: number): Promise<FplFixture[] | null> {
   return promise;
 }
 
+// ── Full-season fixtures cache ────────────────────────────────────
+
+// The /fixtures/ endpoint with no event param returns every fixture in
+// the season (~380, small JSON). Used for team form lookups.
+let allFixturesCache: { data: FplFixture[]; fetchedAt: number } | null = null;
+let allFixturesInflight: Promise<FplFixture[] | null> | null = null;
+
+async function fetchAllFixtures(): Promise<FplFixture[] | null> {
+  if (
+    allFixturesCache &&
+    Date.now() - allFixturesCache.fetchedAt < FIXTURES_TTL_MS
+  ) {
+    return allFixturesCache.data;
+  }
+  if (allFixturesInflight) return allFixturesInflight;
+
+  allFixturesInflight = (async () => {
+    try {
+      const data = await fetchJsonWithRetry<FplFixture[]>(
+        `${FPL_BASE}/fixtures/`,
+      );
+      allFixturesCache = { data, fetchedAt: Date.now() };
+      return data;
+    } catch {
+      return allFixturesCache?.data ?? null;
+    } finally {
+      allFixturesInflight = null;
+    }
+  })();
+
+  return allFixturesInflight;
+}
+
 // ── Public API ────────────────────────────────────────────────────
 
 export async function getTeams(): Promise<string[]> {
@@ -181,6 +214,71 @@ export async function getCurrentGw(): Promise<number | null> {
   // Between gameweeks FPL marks the upcoming GW with is_next.
   const next = data.events.find((e) => e.is_next);
   return next?.id ?? null;
+}
+
+/**
+ * The gameweek the Predict screen should default to: the in-progress GW
+ * if there is one, otherwise the next GW. (FPL keeps is_current on a
+ * finished GW until the next rolls over, so we check the finished flag.)
+ */
+export async function getDefaultGw(): Promise<number | null> {
+  const data = await fetchBootstrap();
+  if (!data) return null;
+  const current = data.events.find((e) => e.is_current);
+  if (current && !current.finished) return current.id;
+  const next = data.events.find((e) => e.is_next);
+  if (next) return next.id;
+  return current?.id ?? null;
+}
+
+export type FormResult = {
+  gw: number;
+  home: boolean;
+  result: "W" | "L" | "D";
+};
+
+/**
+ * A team's last `limit` completed results before `beforeGw`, most recent
+ * last. Each entry says whether the team played home and whether they
+ * won/lost/drew.
+ */
+export async function getTeamForm(
+  teamName: string,
+  beforeGw: number,
+  limit = 5,
+): Promise<FormResult[]> {
+  const [bootstrap, all] = await Promise.all([
+    fetchBootstrap(),
+    fetchAllFixtures(),
+  ]);
+  if (!bootstrap || !all) return [];
+
+  const team = bootstrap.teams.find((t) => t.name === teamName);
+  if (!team) return [];
+  const teamId = team.id;
+
+  const played = all
+    .filter(
+      (f) =>
+        f.finished &&
+        f.event !== null &&
+        f.event < beforeGw &&
+        (f.team_h === teamId || f.team_a === teamId) &&
+        f.team_h_score !== null &&
+        f.team_a_score !== null,
+    )
+    .sort((a, b) => (a.event ?? 0) - (b.event ?? 0));
+
+  const recent = played.slice(-limit);
+
+  return recent.map((f) => {
+    const home = f.team_h === teamId;
+    const us = home ? f.team_h_score! : f.team_a_score!;
+    const them = home ? f.team_a_score! : f.team_h_score!;
+    const result: "W" | "L" | "D" =
+      us > them ? "W" : us < them ? "L" : "D";
+    return { gw: f.event!, home, result };
+  });
 }
 
 /**

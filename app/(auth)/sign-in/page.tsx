@@ -102,6 +102,15 @@ export default function SignInPage() {
               Join with code →
             </a>
           </p>
+          <p className="text-sm text-center text-muted-foreground">
+            New here?{" "}
+            <a
+              href="/how-to-play"
+              className="text-foreground font-medium underline"
+            >
+              How it works →
+            </a>
+          </p>
         </div>
       </div>
     </div>

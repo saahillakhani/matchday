@@ -136,7 +136,14 @@ export default async function Home({
             </div>
           )}
 
-          <form action="/auth/signout" method="post" className="pt-4">
+          <Link
+            href="/how-to-play"
+            className="text-sm text-muted-foreground underline underline-offset-4 pt-2"
+          >
+            How to play
+          </Link>
+
+          <form action="/auth/signout" method="post" className="pt-2">
             <Button type="submit" variant="outline">
               Sign out
             </Button>

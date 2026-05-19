@@ -1,6 +1,11 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getFixtures } from "@/lib/fpl";
+import {
+  getDefaultGw,
+  getFixtures,
+  getTeamForm,
+  type FormResult,
+} from "@/lib/fpl";
 import { filterByTeams, sortFixtures } from "@/lib/match-key";
 import {
   abbreviateName,
@@ -35,14 +40,18 @@ export default async function PredictPage({
 
   if (!league) redirect("/");
 
-  // Default to the league's current GW; allow override via ?gw=
+  // If ?gw= is given, honour it. Otherwise default to the GW in progress
+  // (or the next GW if we're between gameweeks), falling back to the
+  // league's stored current_gw if FPL is unreachable.
   const requestedGw = searchParams.gw
     ? Number.parseInt(searchParams.gw, 10)
     : NaN;
-  const gw =
-    Number.isInteger(requestedGw) && requestedGw >= 1 && requestedGw <= 38
-      ? requestedGw
-      : league.current_gw;
+  let gw: number;
+  if (Number.isInteger(requestedGw) && requestedGw >= 1 && requestedGw <= 38) {
+    gw = requestedGw;
+  } else {
+    gw = (await getDefaultGw()) ?? league.current_gw;
+  }
 
   const fplFixtures = await getFixtures(gw);
   const relevant = filterByTeams(fplFixtures, league.selected_teams);
@@ -117,7 +126,20 @@ export default async function PredictPage({
     abbr: abbreviateName(nameByUserId.get(uid) ?? "—"),
     isStarter: isStarter(rotationIds, uid),
     isOnClock: uid === onClockId,
+    hasSubmitted: submittedIds.has(uid),
   }));
+
+  // Last-5 form for each team in the GW's fixtures. Computed once per
+  // distinct team so a team appearing twice isn't fetched twice.
+  const teamNames = Array.from(
+    new Set(sorted.flatMap((f) => [f.homeTeam, f.awayTeam])),
+  );
+  const formEntries = await Promise.all(
+    teamNames.map(
+      async (name) => [name, await getTeamForm(name, gw)] as const,
+    ),
+  );
+  const formByTeam = new Map<string, FormResult[]>(formEntries);
 
   return (
     <PredictForm
@@ -135,6 +157,8 @@ export default async function PredictPage({
         home: f.homeTeam,
         away: f.awayTeam,
         kickoff: f.kickoffTime,
+        homeForm: formByTeam.get(f.homeTeam) ?? [],
+        awayForm: formByTeam.get(f.awayTeam) ?? [],
       }))}
       existingPicks={existingPicks}
     />

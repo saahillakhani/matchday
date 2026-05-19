@@ -12,11 +12,15 @@ import { PicksMatrix } from "@/components/PicksMatrix";
 import { PlayerChip } from "@/components/PlayerChip";
 import { createClient } from "@/lib/supabase/browser";
 
+type FormResult = { gw: number; home: boolean; result: "W" | "L" | "D" };
+
 type Fixture = {
   matchIndex: number;
   home: string;
   away: string;
   kickoff: string | null;
+  homeForm: FormResult[];
+  awayForm: FormResult[];
 };
 
 type Pick = { home: number | null; away: number | null };
@@ -28,7 +32,10 @@ type RotationEntry = {
   isStarter: boolean;
 };
 
-type RotationChip = RotationEntry & { isOnClock: boolean };
+type RotationChip = RotationEntry & {
+  isOnClock: boolean;
+  hasSubmitted: boolean;
+};
 
 type EveryonePayload = {
   rotation: RotationEntry[];
@@ -289,6 +296,7 @@ export function PredictForm(props: Props) {
                 key={p.userId}
                 displayName={p.displayName}
                 isOnClock={p.isOnClock}
+                hasSubmitted={p.hasSubmitted}
               />
             ))}
           </div>
@@ -394,7 +402,18 @@ function MyPicks({
 
   return (
     <>
-      <div className="mt-6 flex items-center justify-between border border-dashed border-border rounded-card px-3 py-2 text-xs font-mono uppercase tracking-widest text-muted-foreground">
+      {/* Draft status — clear that picks aren't locked in until submitted. */}
+      {!locked && !submitted && (
+        <div className="mt-6 flex items-center gap-2 border border-border rounded-card px-3 py-2 bg-white">
+          <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
+          <p className="text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">Draft</span> — not
+            submitted yet. Your picks stay private until you hit Submit.
+          </p>
+        </div>
+      )}
+
+      <div className="mt-3 flex items-center justify-between border border-dashed border-border rounded-card px-3 py-2 text-xs font-mono uppercase tracking-widest text-muted-foreground">
         <span>
           {filledCount} / {total} scores in
         </span>
@@ -414,6 +433,8 @@ function MyPicks({
             predictedAway={picks[f.matchIndex]?.away ?? null}
             onChange={(h, a) => onPickChange(f.matchIndex, h, a)}
             disabled={readOnly}
+            homeForm={f.homeForm}
+            awayForm={f.awayForm}
           />
         ))}
       </div>
