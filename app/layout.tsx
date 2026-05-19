@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -23,6 +23,16 @@ const mono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "The Matchday",
   description: "Predict the scores. Win the bragging rights.",
+  applicationName: "The Matchday",
+  appleWebApp: {
+    capable: true,
+    title: "Matchday",
+    statusBarStyle: "default",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#F2EDE4",
 };
 
 export default function RootLayout({
