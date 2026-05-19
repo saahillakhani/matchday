@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
+import { NotificationPrompt } from "@/components/notifications";
 import { MAX_LEAGUE_SIZE } from "@/lib/constants";
 
 export default async function Home({
@@ -78,6 +79,8 @@ export default async function Home({
               {profile?.display_name ?? user.email}
             </span>
           </p>
+
+          <NotificationPrompt />
 
           {leagues.length === 0 ? (
             <div className="w-full space-y-2">

@@ -417,8 +417,8 @@ function MyPicks({
         <div className="mt-6 flex items-center gap-2 border border-border rounded-card px-3 py-2 bg-white">
           <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
           <p className="text-xs text-muted-foreground">
-            <span className="font-medium text-foreground">Draft</span> — not
-            submitted yet. Your picks stay private until you hit Submit.
+            <span className="font-medium text-foreground">Draft</span> — your
+            picks stay private until you hit Submit.
           </p>
         </div>
       )}

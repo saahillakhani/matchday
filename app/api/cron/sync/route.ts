@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { syncAllLeagues } from "@/lib/cron-sync";
+import { dispatchSyncNotifications } from "@/lib/push-triggers";
 
 // Vercel cron hits this on the schedule defined in vercel.json. The
 // platform injects an Authorization: Bearer ${CRON_SECRET} header on
@@ -21,6 +22,7 @@ export async function GET(request: Request) {
 
   try {
     const reports = await syncAllLeagues(supabase);
+    await dispatchSyncNotifications(reports);
     return NextResponse.json({
       ok: true,
       ranAt: new Date().toISOString(),

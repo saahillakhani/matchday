@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getFixtures } from "@/lib/fpl";
 import { filterByTeams, sortFixtures } from "@/lib/match-key";
 import { parsePicks } from "@/lib/parse-picks";
+import { notifyNextToPredict } from "@/lib/push-triggers";
 
 type Payload = {
   leagueId?: unknown;
@@ -139,6 +140,9 @@ export async function POST(request: Request) {
     console.error("[predictions/submit] submission insert failed:", submitError);
     return NextResponse.json({ error: submitError.message }, { status: 500 });
   }
+
+  // Nudge the next player if this submission moved the rotation on.
+  await notifyNextToPredict(leagueId, gw, user.id);
 
   return NextResponse.json({ ok: true });
 }

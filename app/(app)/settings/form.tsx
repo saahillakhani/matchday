@@ -7,6 +7,7 @@ import { ArrowLeft, ChevronRight, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NavTabs } from "@/components/NavTabs";
+import { NotificationToggle } from "@/components/notifications";
 
 type Member = {
   userId: string;
@@ -32,9 +33,8 @@ type UnlockState =
 export function SettingsView(props: Props) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
-  // Local-only toggle state — wired to nothing in MVP per build plan.
-  // The screen visually completes the design; persistence comes post-v1.
-  const [notifications, setNotifications] = useState(true);
+  // Lock-at-kickoff is local-only display state — the cron always locks
+  // at kickoff regardless. Notifications are real (see NotificationToggle).
   const [lockAtKickoff, setLockAtKickoff] = useState(true);
 
   // Admin "unlock a gameweek" control.
@@ -143,12 +143,7 @@ export function SettingsView(props: Props) {
 
         {/* Settings rows */}
         <section className="mt-6">
-          <SettingsRow
-            label="Notifications"
-            value={notifications ? "On" : "Off"}
-            toggle={notifications}
-            onToggle={setNotifications}
-          />
+          <NotificationToggle />
           <SettingsRow
             label="Lock at kickoff"
             value="Auto"
