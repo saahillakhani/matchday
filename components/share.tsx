@@ -7,7 +7,7 @@ import {
   type RefObject,
 } from "react";
 import { toBlob } from "html-to-image";
-import { Share2 } from "lucide-react";
+import { Share } from "lucide-react";
 
 /**
  * Off-screen, branded frame used purely as a screenshot source. Rendered
@@ -96,7 +96,7 @@ export function ShareButton({
       disabled={busy}
       className="inline-flex items-center gap-1.5 text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors"
     >
-      <Share2 className="w-3.5 h-3.5" />
+      <Share className="w-3.5 h-3.5" />
       {busy ? "Preparing…" : "Share"}
     </button>
   );
