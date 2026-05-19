@@ -122,8 +122,10 @@ export default async function TablePage({
     };
   });
 
-  // Is the latest gameweek with results actually finished? Drives the
-  // "After GW X" vs "GW X still in play" header.
+  // Is the latest gameweek with results actually finished? "Complete"
+  // means OUR results table has a row for every fixture of that GW — not
+  // just FPL's finished flag, which can run ahead of our cron sync and
+  // would otherwise make the Verdict flicker between gameweeks.
   let latestGwComplete = true;
   // The Verdict recaps the last *completed* gameweek — if the latest one
   // is still in play, step back to the previous gameweek.
@@ -132,8 +134,12 @@ export default async function TablePage({
     const latestFixtures = sortFixtures(
       filterByTeams(await getFixtures(latestGw), league.selected_teams),
     );
+    const latestResultCount = results.filter(
+      (r) => r.gw === latestGw,
+    ).length;
     latestGwComplete =
-      latestFixtures.length === 0 || latestFixtures.every((f) => f.finished);
+      latestFixtures.length > 0 &&
+      latestResultCount >= latestFixtures.length;
 
     const verdictGw = latestGwComplete ? latestGw : latestGw - 1;
     if (verdictGw >= 1) {
