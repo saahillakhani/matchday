@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { FormBars } from "@/components/FormBars";
 import { NavTabs } from "@/components/NavTabs";
+import { ShareButton, ShareCapture } from "@/components/share";
 import { createClient } from "@/lib/supabase/browser";
 
 type TableRow = {
@@ -62,6 +63,7 @@ type Props = {
 export function TableView(props: Props) {
   const router = useRouter();
   const [view, setView] = useState<View>("table");
+  const tableShareRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -125,7 +127,30 @@ export function TableView(props: Props) {
         <ViewToggle view={view} onChange={setView} />
 
         {view === "table" ? (
-          <SeasonTable rows={props.tableRows} />
+          <>
+            {props.tableRows.length > 0 && (
+              <div className="mt-4 flex justify-end">
+                <ShareButton
+                  targetRef={tableShareRef}
+                  filename={`matchday-gw${props.afterGw ?? ""}-table.png`}
+                  shareTitle={`${props.leagueName} — the table`}
+                />
+              </div>
+            )}
+            <SeasonTable rows={props.tableRows} />
+            {props.tableRows.length > 0 && (
+              <ShareCapture
+                ref={tableShareRef}
+                subtitle={`${props.leagueName} · ${
+                  props.afterGw !== null
+                    ? `after GW ${props.afterGw}`
+                    : "the table"
+                }`}
+              >
+                <SeasonTable rows={props.tableRows} />
+              </ShareCapture>
+            )}
+          </>
         ) : (
           <FormGrid players={props.players} />
         )}

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { MatchRow } from "@/components/MatchRow";
 import { NavTabs } from "@/components/NavTabs";
 import { PicksMatrix } from "@/components/PicksMatrix";
 import { PlayerChip } from "@/components/PlayerChip";
+import { ShareButton, ShareCapture } from "@/components/share";
 import { createClient } from "@/lib/supabase/browser";
 
 type FormResult = { gw: number; home: boolean; result: "W" | "L" | "D" };
@@ -328,6 +329,8 @@ export function PredictForm(props: Props) {
             state={everyone}
             fixtures={props.fixtures}
             me={props.userId}
+            leagueName={props.leagueName}
+            gw={props.selectedGw}
           />
         )}
       </div>
@@ -500,11 +503,17 @@ function EveryoneView({
   state,
   fixtures,
   me,
+  leagueName,
+  gw,
 }: {
   state: EveryoneState;
   fixtures: Fixture[];
   me: string;
+  leagueName: string;
+  gw: number;
 }) {
+  const shareRef = useRef<HTMLDivElement>(null);
+
   if (state.kind === "loading" || state.kind === "idle") {
     return (
       <p className="text-sm text-muted-foreground italic text-center mt-12">
@@ -519,7 +528,8 @@ function EveryoneView({
       </p>
     );
   }
-  return (
+
+  const matrix = (
     <PicksMatrix
       rotation={state.data.rotation}
       fixtures={fixtures}
@@ -527,6 +537,33 @@ function EveryoneView({
       me={me}
       locked={state.data.locked}
     />
+  );
+
+  // Share is only meaningful with an actual matrix to capture.
+  const canShare =
+    state.data.rotation.length > 0 && fixtures.length > 0;
+
+  return (
+    <>
+      {canShare && (
+        <div className="mt-4 flex justify-end">
+          <ShareButton
+            targetRef={shareRef}
+            filename={`matchday-gw${gw}-picks.png`}
+            shareTitle={`${leagueName} — GW ${gw} picks`}
+          />
+        </div>
+      )}
+      {matrix}
+      {canShare && (
+        <ShareCapture
+          ref={shareRef}
+          subtitle={`${leagueName} · GW ${gw} · Everyone's Picks`}
+        >
+          {matrix}
+        </ShareCapture>
+      )}
+    </>
   );
 }
 
