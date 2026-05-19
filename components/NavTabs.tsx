@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HelpCircle } from "lucide-react";
 
 type Tab = "predict" | "results" | "table" | "you";
 
@@ -30,7 +31,7 @@ export function NavTabs({
   leagueId: string;
 }) {
   return (
-    <nav className="flex gap-6 text-xs uppercase tracking-widest border-b border-border">
+    <nav className="flex items-center gap-6 text-xs uppercase tracking-widest border-b border-border">
       {TABS.map((t) => {
         const isActive = t.id === current;
         const base = "pb-2 -mb-px border-b-2 transition-colors";
@@ -59,6 +60,13 @@ export function NavTabs({
           </Link>
         );
       })}
+      <Link
+        href="/how-to-play"
+        aria-label="How to play"
+        className="ml-auto pb-2 -mb-px text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <HelpCircle className="w-4 h-4" />
+      </Link>
     </nav>
   );
 }

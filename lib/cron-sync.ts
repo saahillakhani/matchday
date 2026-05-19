@@ -144,7 +144,14 @@ export async function syncLeague(
       return { leagueId: league.id, fromGw, action: "advanced-no-members" };
     }
 
-    const baseOrder = fisherYatesShuffle(memberIds);
+    // base_order is the season-long rotation seed — shuffled ONCE, the
+    // first time the league locks. Every later gameweek's order is just
+    // base_order rotated by (gw-1). If it's already set (e.g. a returning
+    // league, or a backfilled one), keep it — never reshuffle.
+    const baseOrder =
+      league.base_order.length > 0
+        ? league.base_order
+        : fisherYatesShuffle(memberIds);
     await supabase
       .from("leagues")
       .update({ base_order: baseOrder, locked: true })

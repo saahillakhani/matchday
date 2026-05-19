@@ -230,6 +230,13 @@ export function PredictForm(props: Props) {
       });
       return;
     }
+    if (
+      !window.confirm(
+        "Submit your picks for this gameweek? You won't be able to change them afterwards — only the league admin can unlock a gameweek.",
+      )
+    ) {
+      return;
+    }
     setState({ kind: "submitting" });
     const res = await fetch("/api/predictions/submit", {
       method: "POST",

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getFixtures } from "@/lib/fpl";
+import { getDefaultGw, getFixtures } from "@/lib/fpl";
 import { filterByTeams, sortFixtures } from "@/lib/match-key";
 import { aggregate, scorePick, type Outcome } from "@/lib/scoring";
 import { ResultsView } from "./form";
@@ -27,13 +27,18 @@ export default async function ResultsPage({
 
   if (!league) redirect("/");
 
+  // Honour ?gw=; otherwise default to the in-progress gameweek (or next
+  // one between GWs), matching the Predict tab. Falls back to the
+  // league's stored current_gw if FPL is unreachable.
   const requestedGw = searchParams.gw
     ? Number.parseInt(searchParams.gw, 10)
     : NaN;
-  const gw =
-    Number.isInteger(requestedGw) && requestedGw >= 1 && requestedGw <= 38
-      ? requestedGw
-      : league.current_gw;
+  let gw: number;
+  if (Number.isInteger(requestedGw) && requestedGw >= 1 && requestedGw <= 38) {
+    gw = requestedGw;
+  } else {
+    gw = (await getDefaultGw()) ?? league.current_gw;
+  }
 
   const fplFixtures = await getFixtures(gw);
   const relevant = filterByTeams(fplFixtures, league.selected_teams);
