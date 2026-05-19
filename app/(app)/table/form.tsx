@@ -54,6 +54,7 @@ type Props = {
   leagueName: string;
   tableRows: TableRow[];
   afterGw: number | null;
+  latestGwComplete: boolean;
   players: Player[];
   verdict: Verdict | null;
 };
@@ -111,7 +112,9 @@ export function TableView(props: Props) {
         </h1>
         {props.afterGw !== null && (
           <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mt-2">
-            After GW {props.afterGw}
+            {props.latestGwComplete
+              ? `After GW ${props.afterGw}`
+              : `GW ${props.afterGw} still in play`}
           </p>
         )}
 
@@ -283,67 +286,75 @@ function VerdictCard({ verdict }: { verdict: Verdict }) {
   return (
     <section className="mt-8 border-t border-border pt-6">
       <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-        GW {verdict.gw} · The Verdict
+        The Verdict · last completed gameweek
       </p>
       <p className="font-serif text-xl italic font-medium leading-snug mt-2">
         {verdict.headline}
       </p>
 
-      {verdict.topOfGw && (
-        <div className="mt-4 inline-flex items-center gap-2 bg-foreground text-background rounded-full px-3 py-1.5">
-          <span className="text-[10px] uppercase tracking-widest opacity-80">
-            ★ Top of GW
-          </span>
-          <span className="text-sm font-medium">
-            {verdict.topOfGw.name}
-          </span>
-          <span className="font-mono text-sm">
-            {verdict.topOfGw.points} pts
-          </span>
-        </div>
-      )}
+      <div className="mt-4 border border-border rounded-card bg-white divide-y divide-border">
+        <VerdictRow label={`★ Top of GW ${verdict.gw}`}>
+          {verdict.topOfGw ? (
+            <>
+              <span className="font-medium">{verdict.topOfGw.name}</span>
+              <span className="font-mono text-muted-foreground ml-2">
+                {verdict.topOfGw.points} pts
+                {verdict.topOfGw.exacts > 0 &&
+                  ` · ${verdict.topOfGw.exacts} exact`}
+              </span>
+            </>
+          ) : (
+            <span className="text-muted-foreground italic">—</span>
+          )}
+        </VerdictRow>
 
-      <div className="grid grid-cols-2 gap-3 mt-4">
-        <div className="border border-border rounded-card px-4 py-3 bg-white">
-          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-            Best pick
-          </p>
+        <VerdictRow label="Best pick">
           {verdict.bestPick ? (
             <>
-              <p className="font-medium text-sm mt-1">
-                {verdict.bestPick.name}
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {verdict.bestPick.scoreline} · {verdict.bestPick.fixture} ✓
-              </p>
+              <span className="font-medium">{verdict.bestPick.name}</span>
+              <span className="text-muted-foreground ml-2">
+                called {verdict.bestPick.scoreline} ·{" "}
+                {verdict.bestPick.fixture}
+              </span>
             </>
           ) : (
-            <p className="text-xs text-muted-foreground italic mt-1">
-              No exact scores this week.
-            </p>
+            <span className="text-muted-foreground italic">
+              No exact scores this week
+            </span>
           )}
-        </div>
-        <div className="border border-border rounded-card px-4 py-3 bg-white">
-          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-            Worst pick
-          </p>
+        </VerdictRow>
+
+        <VerdictRow label="Worst pick">
           {verdict.worstPick ? (
             <>
-              <p className="font-medium text-sm mt-1">
-                {verdict.worstPick.name}
-              </p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {verdict.worstPick.predicted} · ended{" "}
+              <span className="font-medium">{verdict.worstPick.name}</span>
+              <span className="text-muted-foreground ml-2">
+                said {verdict.worstPick.predicted}, it ended{" "}
                 {verdict.worstPick.actual}
-              </p>
+              </span>
             </>
           ) : (
-            <p className="text-xs text-muted-foreground italic mt-1">
-              —
-            </p>
+            <span className="text-muted-foreground italic">—</span>
           )}
-        </div>
+        </VerdictRow>
       </div>
     </section>
+  );
+}
+
+function VerdictRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="px-4 py-3">
+      <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+        {label}
+      </p>
+      <p className="text-sm mt-1">{children}</p>
+    </div>
   );
 }

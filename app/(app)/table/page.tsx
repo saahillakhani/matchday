@@ -122,24 +122,42 @@ export default async function TablePage({
     };
   });
 
-  // The Verdict — a recap of the most recent gameweek that has results.
+  // Is the latest gameweek with results actually finished? Drives the
+  // "After GW X" vs "GW X still in play" header.
+  let latestGwComplete = true;
+  // The Verdict recaps the last *completed* gameweek — if the latest one
+  // is still in play, step back to the previous gameweek.
   let verdict = null;
   if (latestGw !== null) {
-    const fplFixtures = await getFixtures(latestGw);
-    const gwFixtures = sortFixtures(
-      filterByTeams(fplFixtures, league.selected_teams),
-    ).map((f) => ({
-      matchIndex: f.matchIndex,
-      homeTeam: f.homeTeam,
-      awayTeam: f.awayTeam,
-    }));
-    verdict = buildVerdict({
-      members,
-      picks,
-      results,
-      fixtures: gwFixtures,
-      gw: latestGw,
-    });
+    const latestFixtures = sortFixtures(
+      filterByTeams(await getFixtures(latestGw), league.selected_teams),
+    );
+    latestGwComplete =
+      latestFixtures.length === 0 || latestFixtures.every((f) => f.finished);
+
+    const verdictGw = latestGwComplete ? latestGw : latestGw - 1;
+    if (verdictGw >= 1) {
+      const verdictFixtures =
+        verdictGw === latestGw
+          ? latestFixtures
+          : sortFixtures(
+              filterByTeams(
+                await getFixtures(verdictGw),
+                league.selected_teams,
+              ),
+            );
+      verdict = buildVerdict({
+        members,
+        picks,
+        results,
+        fixtures: verdictFixtures.map((f) => ({
+          matchIndex: f.matchIndex,
+          homeTeam: f.homeTeam,
+          awayTeam: f.awayTeam,
+        })),
+        gw: verdictGw,
+      });
+    }
   }
 
   return (
@@ -148,6 +166,7 @@ export default async function TablePage({
       leagueName={league.name}
       tableRows={tableRows}
       afterGw={latestGw}
+      latestGwComplete={latestGwComplete}
       players={players}
       verdict={verdict}
     />
