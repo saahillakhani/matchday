@@ -120,6 +120,9 @@ const SUBTITLES: Record<ToggleState, string> = {
 /** The Notifications row for the Settings screen. */
 export function NotificationToggle() {
   const [state, setState] = useState<ToggleState>("loading");
+  const [test, setTest] = useState<"idle" | "sending" | "sent" | "error">(
+    "idle",
+  );
 
   useEffect(() => {
     let active = true;
@@ -164,37 +167,65 @@ export function NotificationToggle() {
     }
   }
 
+  async function sendTest() {
+    setTest("sending");
+    try {
+      const res = await fetch("/api/push/test", { method: "POST" });
+      setTest(res.ok ? "sent" : "error");
+    } catch {
+      setTest("error");
+    }
+  }
+
   const showSwitch = state === "on" || state === "off" || state === "working";
 
   return (
-    <div className="flex items-center justify-between border-t border-border py-4">
-      <div className="pr-4">
-        <p className="text-sm font-medium">Notifications</p>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          {SUBTITLES[state]}
-        </p>
+    <div className="border-t border-border">
+      <div className="flex items-center justify-between py-4">
+        <div className="pr-4">
+          <p className="text-sm font-medium">Notifications</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {SUBTITLES[state]}
+          </p>
+        </div>
+        {showSwitch && (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={state === "on"}
+            disabled={state === "working"}
+            onClick={toggle}
+            className={[
+              "inline-flex items-center w-11 h-6 rounded-full px-0.5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+              state === "on"
+                ? "justify-end bg-foreground"
+                : "justify-start bg-muted",
+              state === "working"
+                ? "opacity-40 cursor-not-allowed"
+                : "cursor-pointer",
+            ].join(" ")}
+          >
+            <span
+              aria-hidden
+              className="block w-5 h-5 rounded-full bg-white shadow-sm"
+            />
+          </button>
+        )}
       </div>
-      {showSwitch && (
+      {state === "on" && (
         <button
           type="button"
-          role="switch"
-          aria-checked={state === "on"}
-          disabled={state === "working"}
-          onClick={toggle}
-          className={[
-            "inline-flex items-center w-11 h-6 rounded-full px-0.5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-            state === "on"
-              ? "justify-end bg-foreground"
-              : "justify-start bg-muted",
-            state === "working"
-              ? "opacity-40 cursor-not-allowed"
-              : "cursor-pointer",
-          ].join(" ")}
+          onClick={sendTest}
+          disabled={test === "sending"}
+          className="block pb-4 -mt-1 text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors"
         >
-          <span
-            aria-hidden
-            className="block w-5 h-5 rounded-full bg-white shadow-sm"
-          />
+          {test === "idle"
+            ? "Send a test notification"
+            : test === "sending"
+              ? "Sending…"
+              : test === "sent"
+                ? "Sent — check your phone"
+                : "Couldn't send — tap to retry"}
         </button>
       )}
     </div>
